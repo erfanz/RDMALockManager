@@ -180,7 +180,6 @@ int server_socket_setup(int *server_sockfd, int backlog);
 
 void die(const char *reason);
 
-int load_tables_from_files(ItemVersion* items_region);
 
 
 #endif /* UTILS_H_ */
