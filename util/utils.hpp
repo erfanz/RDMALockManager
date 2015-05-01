@@ -8,8 +8,7 @@
 #ifndef UTILS_H_
 #define UTILS_H_
 
-#include "../../config.hpp"
-#include "../tpcw-tables/item_version.hpp"
+#include "../config.hpp"
 #include <stdint.h>
 #include <byteswap.h>
 
