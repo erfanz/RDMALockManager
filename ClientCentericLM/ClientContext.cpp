@@ -6,8 +6,7 @@
  */
 
 #include "ClientContext.hpp"
-#include "../../util/utils.hpp"
-#include "../benchmark-config.hpp"
+#include "../util/utils.hpp"
 #include <unistd.h>		// for close
 #include <iostream>
 

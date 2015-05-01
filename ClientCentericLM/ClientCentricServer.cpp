@@ -1,14 +1,13 @@
 /*
- *	BenchmarkServer.cpp
+ *	ClientCentricServer.cpp
  *
  *	Created on: 25.Jan.2015
  *	Author: erfanz
  */
 
-#include "BenchmarkServerRDMA.hpp"
-#include "../benchmark-config.hpp"
-#include "../../../config.hpp"
-#include "../../util/utils.hpp"
+#include "ClientCentricServer.hpp"
+#include "../config.hpp"
+#include "../util/utils.hpp"
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -21,31 +20,31 @@
 #include <netdb.h>
 #include <iostream>
 
-BenchmarkServerRDMA::~BenchmarkServerRDMA () {
+ClientCentricServer::~ClientCentricServer () {
 	delete[](local_buffer);
 	close(server_sockfd);
 }
 
-int BenchmarkServerRDMA::initialize_data_structures(){
+int ClientCentricServer::initialize_data_structures(){
 	local_buffer = new char[SERVER_REGION_SIZE];
 	for (int i = 0; i < SERVER_REGION_SIZE; i++)
 		local_buffer[i] = 0;
 	return 0;
 }
 
-int BenchmarkServerRDMA::initialize_context(ServerContext &ctx) {
+int ClientCentricServer::initialize_context(ServerContext &ctx) {
 	ctx.ib_port				= ib_port;
 	ctx.local_buffer		= local_buffer;
 	return 0;
 }
 
-void BenchmarkServerRDMA::usage (const char *argv0) {
+void ClientCentricServer::usage (const char *argv0) {
 	std::cout << "Usage:" << std::endl;
 	std::cout << argv0 << std::endl;
 	std::cout << "starts a server and waits for connection on port Config.SERVER_TCP_PORT" << std::endl;
 }
 
-void* BenchmarkServerRDMA::handle_client(void *param) {
+void* ClientCentricServer::handle_client(void *param) {
 	ServerContext *ctx = (ServerContext *) param;
 	char temp_char;
 	
@@ -83,11 +82,10 @@ void* BenchmarkServerRDMA::handle_client(void *param) {
 }
 
 
-int BenchmarkServerRDMA::start_server (int server_num) {	
+int ClientCentricServer::start_server (int server_num) {	
 	tcp_port	= SERVER_TCP_PORT
 	ib_port		= SERVER_IB_PORT;
 	ServerContext ctx[CLIENTS_CNT];
-	pthread_t master_threads[CLIENTS_CNT];
 	struct sockaddr_in serv_addr, cli_addr;
 	socklen_t clilen = sizeof(cli_addr);
 	char temp_char;
@@ -95,7 +93,7 @@ int BenchmarkServerRDMA::start_server (int server_num) {
 	
 	TEST_NZ(initialize_data_structures());
 
-	std::cout << "[Info] Server " << server_num << " is waiting for " << CLIENTS_CNT
+	std::cout << "[Info] Server is waiting for " << CLIENTS_CNT
 		<< " client(s) on tcp port: " << tcp_port << ", ib port: " << ib_port << std::endl;
 	
 	// Open Socket
@@ -193,10 +191,10 @@ int BenchmarkServerRDMA::start_server (int server_num) {
 
 int main (int argc, char *argv[]) {
 	if (argc != 1) {
-		BenchmarkServerRDMA::usage(argv[0]);
+		ClientCentricServer::usage(argv[0]);
 		return 1;
 	}
-	BenchmarkServerRDMA server;
+	ClientCentricServer server;
 	server.start_server();
 	return 0;
 }

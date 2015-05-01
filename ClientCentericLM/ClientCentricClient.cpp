@@ -6,9 +6,8 @@
  */
 
 #include "ClientCentricClient.hpp"
-#include "../../util/utils.hpp"
-#include "../benchmark-config.hpp"
-#include "../../../config.hpp"
+#include "../util/utils.hpp"
+#include "../config.hpp"
 
 #include <stdio.h>
 #include <string.h>

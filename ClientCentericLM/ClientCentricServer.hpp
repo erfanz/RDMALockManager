@@ -1,22 +1,22 @@
 /*
- *	BenchmarkServerRDMA.hpp
+ *	ClientCentricServer.hpp
  *
  *	Created on: 25.Jan.2015
  *	Author: erfanz
  */
 
-#ifndef BENCHMARK_SERVER_RMDA_H_
-#define BENCHMARK_SERVER_RDMA_H_
+#ifndef CLIENT_CENTRIC_SERVER_H_
+#define CLIENT_CENTRIC_SERVER_H_
 
 #include "ServerContext.hpp"
-#include "../../util/RDMACommon.hpp"
+#include "../util/RDMACommon.hpp"
 
 #include <stdint.h>
 #include <stdlib.h>
 #include <infiniband/verbs.h>
 
 
-class BenchmarkServerRDMA{
+class ClientCentricServer{
 private:
 	int	server_sockfd;		// Server's socket file descriptor
 	int	tcp_port;
@@ -66,7 +66,7 @@ public:
 	******************************************************************************/
 	static void usage (const char *argv0);
 	
-	~BenchmarkServerRDMA ();
+	~ClientCentricServer ();
 	
 };
-#endif /* BENCHMARK_SERVER_RDMA_H_ */
+#endif /* CLIENT_CENTRIC_SERVER_H_ */
