@@ -41,9 +41,8 @@ int BenchmarkServerRDMA::initialize_context(ServerContext &ctx) {
 
 void BenchmarkServerRDMA::usage (const char *argv0) {
 	std::cout << "Usage:" << std::endl;
-	std::cout << argv0 << " <i = server_num>" << std::endl;
-	std::cout << "starts a server and waits for connection on port Config.TCP_PORT[i]" << std::endl;
-	std::cout << "(valid range of i: 0, 1, ..., [Config.SERVER_CNT - 1])" << std::endl;
+	std::cout << argv0 << std::endl;
+	std::cout << "starts a server and waits for connection on port Config.SERVER_TCP_PORT" << std::endl;
 }
 
 void* BenchmarkServerRDMA::handle_client(void *param) {
@@ -85,8 +84,8 @@ void* BenchmarkServerRDMA::handle_client(void *param) {
 
 
 int BenchmarkServerRDMA::start_server (int server_num) {	
-	tcp_port	= TCP_PORT[server_num];
-	ib_port		= IB_PORT[server_num];
+	tcp_port	= SERVER_TCP_PORT
+	ib_port		= SERVER_IB_PORT;
 	ServerContext ctx[CLIENTS_CNT];
 	pthread_t master_threads[CLIENTS_CNT];
 	struct sockaddr_in serv_addr, cli_addr;
@@ -193,11 +192,11 @@ int BenchmarkServerRDMA::start_server (int server_num) {
 }
 
 int main (int argc, char *argv[]) {
-	if (argc != 2) {
+	if (argc != 1) {
 		BenchmarkServerRDMA::usage(argv[0]);
 		return 1;
 	}
 	BenchmarkServerRDMA server;
-	server.start_server(atoi(argv[1]));
+	server.start_server();
 	return 0;
 }
