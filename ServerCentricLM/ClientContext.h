@@ -1,9 +1,8 @@
 //
 //  ClientContext.h
-//  Lock Manager
+//  ServerCentricLM
 //
 //  Created by Yeounoh Chung on 5/1/15.
-//  Copyright (c) 2015 Yeounoh Chung. All rights reserved.
 //
 
 #ifndef __Lock_Manager__ClientContext__
@@ -15,19 +14,17 @@
 
 class ClientContext : public BaseContext {
 public:
-    int trx_num;
-    struct Cart				shopping_cart;
+	int op_num; //operations (e.g., lock acquisition)
     
-    std::string client_ip;
-    int client_port;
-    
-    // memory bufferes
-    struct CommitRequest	commit_request;
-    struct CommitResponse	commit_response;
-    
-    int create_context ();
-    int register_memory ();
-    int destroy_context ();
+	std::string client_ip;
+	int client_port;
+
+	//struct ibv_* defined in BaseContext 
+	//int sockfd defined in BaseContext
+	
+	int create_context ();
+	int register_memory (); //abstract func in BaseContext
+	int destroy_context (); //abstract func in BaseContext
 };
 
-#endif /* defined(__Lock_Manager__ClientContext__) */
+#endif

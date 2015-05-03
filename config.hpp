@@ -12,7 +12,7 @@
 #include <string>
 
 
-#define DEBUG_ENABLED (false)
+#define DEBUG_ENABLED (true)
 static const int	CLIENTS_CNT 	= 1;
 
 
