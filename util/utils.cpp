@@ -27,6 +27,41 @@ int pin_to_CPU (int CPU_num){
 	return 0;
 }
 
+int sleep_for_microsec(int sleep_usec) {
+	double elapsed_time = 0;
+		
+	if (sleep_usec == 0)
+		return 0;
+	
+	struct timespec ttime,curtime;
+
+	// // get the current time
+	// clock_gettime(CLOCK_REALTIME,&ttime);
+	//
+	// // clear the nanoseconds and keep the seconds in order not to overflow the nanoseconds
+	// ttime.tv_nsec = 0;
+	//
+	// // set it back
+	// clock_settime(CLOCK_REALTIME,&ttime);
+
+	// get the time again 
+	clock_gettime(CLOCK_REALTIME,&ttime);
+
+	// increase the nano seconds by usec * 1000
+	ttime.tv_nsec += sleep_usec * 1000;
+	
+	// loop
+	while(true){
+		// if (curtime.tv_nsec > ttime.tv_nsec)
+		// 	    break;
+		clock_gettime(CLOCK_REALTIME,&curtime);
+		elapsed_time = ( ( curtime.tv_sec - ttime.tv_sec ) * 1E9 + ( curtime.tv_nsec - ttime.tv_nsec ) ) / 1000;
+		if (elapsed_time > sleep_usec)
+			break;
+	}
+	return 0;
+}
+
 
 // http://www.concentric.net/~Ttwang/tech/inthash.htm
 unsigned long generate_random_seed()

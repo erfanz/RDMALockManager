@@ -87,6 +87,17 @@ static inline uint32_t hton32 (uint32_t x)
 ******************************************************************************/
 int pin_to_CPU (int CPU_num);
 
+
+
+/******************************************************************************
+* Function: sleep_for_microsec
+*
+* Description
+* sleep for the specified micro seconds
+******************************************************************************/
+int sleep_for_microsec(int sleep_usec);
+
+
 /******************************************************************************
 * Function: generate_random_seed
 *
