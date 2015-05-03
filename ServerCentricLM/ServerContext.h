@@ -10,9 +10,9 @@
 #define __Lock_Manager__ServerContext__
 
 #include <stdio.h>
-#include "../util/BaseContext.hpp"
 #include "ClientContext.h"
-#include "config.hpp"
+#include "../util/BaseContext.hpp"
+#include "../config.hpp"
 
 class ServerContext : public BaseContext {
 public:

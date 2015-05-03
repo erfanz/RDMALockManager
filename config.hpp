@@ -12,8 +12,13 @@
 #include <string>
 
 
+<<<<<<< HEAD
 #define DEBUG_ENABLED (false)
 static const int	CLIENTS_CNT 	= 2;
+=======
+#define DEBUG_ENABLED (true)
+static const int	CLIENTS_CNT 	= 1;
+>>>>>>> 43b248a710d98c8437685ae399e2b84aacc65528
 
 
 static const std::string	SERVER_ADDR		= "192.168.1.1";	// only relevant for Tranditional-SI
