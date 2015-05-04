@@ -57,6 +57,7 @@ int LockClient::start_operation (ClientContext &ctx) {
 		// ************************************************************************
 		//	Clients release the acquired lock.
 		req_release.request_type = LockRequest::RELEASE;
+		req_release.request_item = req.request_item;
 		clock_gettime(CLOCK_REALTIME, &beforeRelease); // Fire the  timer		
 		release_lock (ctx, req_release, res);
 		clock_gettime(CLOCK_REALTIME, &afterRelease);	// Fire the  timer
@@ -96,9 +97,11 @@ int LockClient::select_item (struct LockRequest &req) {
 		int num_fragment = (int) ITEM_CNT / RAND_MAX + 1;
 		int target_idx = ((rand() % num_fragment)*RAND_MAX - 1) + (rand() % ITEM_CNT);
 	}
-	int lock_type = rand() % 2; // 50-50 exclusive and shared locks
+	
+	
+	double pdf = (double) rand()/RAND_MAX; // 50-50 exclusive and shared locks
 	req.request_item = target_idx;
-	if (lock_type == 0){
+	if (pdf >= SHARED_TO_MIX_RATIO){
 		req.request_type = LockRequest::EXCLUSIVE;
 	}
 	else {

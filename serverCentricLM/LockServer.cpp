@@ -56,19 +56,17 @@ int LockServer::start_operation(ServerContext &ctx) {
 		DEBUG_COUT (std::endl << "[Info] Waiting for operation #" << ctx.client_ctx.op_num/2 << " from client " << ctx.client_ctx.sockfd);
 		
 		DEBUG_COUT ("[INFO] Queue/start ------------------------" << ctx.client_ctx.sockfd);
-		for (int i=0;i<ITEM_CNT;i++){
-			list_mutex[i].lock();
-			std::list<QueuedRequest> *list_p = &list_array[i];
-			std::cout << i << ":   " ;
-			for (std::list<QueuedRequest>::iterator itr=list_p->begin(); itr != list_p->end();++itr){
-				std::cout << (*itr).ctx->client_ctx.sockfd << "(" << (*itr).req.request_type << ") " ;
-			}
-			std::cout << std::endl;
-			list_mutex[i].unlock();
-		}
+		// for (int i=0;i<ITEM_CNT;i++){
+		// 	list_mutex[i].lock();
+		// 	std::list<QueuedRequest> *list_p = &list_array[i];
+		// 	std::cout << i << ":   " ;
+		// 	for (std::list<QueuedRequest>::iterator itr=list_p->begin(); itr != list_p->end();++itr){
+		// 		std::cout << (*itr).ctx->client_ctx.sockfd << "(" << (*itr).req.request_type << ") " ;
+		// 	}
+		// 	std::cout << std::endl;
+		// 	list_mutex[i].unlock();
+		// }
 		
-		
-
 
 		// ************************************************************************
 		// Step 1: Waits for client to post a lock request
@@ -84,7 +82,7 @@ int LockServer::start_operation(ServerContext &ctx) {
 	}
 
 	clock_gettime(CLOCK_REALTIME, &lastRequestTime);	// Fire the  timer
-	double micro_elapsed_time = ( ( lastRequestTime.tv_sec - firstRequestTime.tv_sec ) * 1E9 + ( lastRequestTime.tv_nsec - firstRequestTime.tv_nsec ) ) / 1000;
+	double micro_elapsed_time = ( ( lastRequestTime.tv_sec - firstRequestTime.tv_sec ) * 1E9 + ( lastRequestTime.tv_nsec - firstRequestTime.tv_nsec ) ) / 1E3;
 	//avg_lock /= 1000;
 
 	std::cout << std::endl << "Total Elapsed time (u sec): " << micro_elapsed_time << std::endl;

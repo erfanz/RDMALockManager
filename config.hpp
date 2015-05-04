@@ -26,7 +26,7 @@ static const int	ITEM_CNT				= 2;		// Number of Items
 static const int	LOCK_OWNERSHIP_MEAN_USEC		= 0;	// the mean time to own a lock in micro sec  ;
 static const int	LOCK_OWNERSHIP_VARIANCE_USEC	= 0;	// the variance of time of holding a lock
 
-
+static const int 	SHARED_TO_MIX_RATIO		= 0.7;	// [0,1], 0- all exclusive, 1- all shared
 
 static const int	TIMEOUT_IN_MS			= 500;		/* ms */
 static const int	BACK_OFF_MICRO_SEC		= 5;
