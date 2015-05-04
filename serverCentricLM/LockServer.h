@@ -22,6 +22,7 @@
 #include <vector>
 #include <arpa/inet.h>
 #include <infiniband/verbs.h>
+#include <mutex>
 
 struct QueuedRequest {
 	ServerContext *ctx;
@@ -33,14 +34,15 @@ class LockServer { //not extending BaseServer (removed)
 protected:
 	int server_sockfd;
 	
-	static int register_request (ServerContext &ctx, struct LockRequest &req);
-	static int grant_request (ServerContext &ctx, struct LockRequest &req, struct LockResponse &res);
+	static int register_request (ServerContext &ctx, struct LockRequest &req, struct LockResponse &res);
+	static int grant_shared_locks (struct LockRequest &req, struct LockResponse &res);
 	int destroy_resources ();
 	
 private:
 	
 	static std::list <QueuedRequest> list_array[ITEM_CNT]; //for array[const size], don't need to clean up
-	
+	static std::mutex list_mutex[ITEM_CNT];
+		
     static void* handle_client(void *param);
     static int start_operation (ServerContext &ctx);
     

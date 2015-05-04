@@ -15,3 +15,9 @@ fi
 echo "sending file(s) to /data/yeounoh/RDMALockManager/$dest"
 
 scp -r  $file yeounoh@bsn00.cs.brown.edu:/data/yeounoh/RDMALockManager/$dest
+scp -r  $file yeounoh@bsn01.cs.brown.edu:/data/yeounoh/RDMALockManager/$dest
+scp -r  $file yeounoh@bsn02.cs.brown.edu:/data/yeounoh/RDMALockManager/$dest
+scp -r  $file yeounoh@bsn03.cs.brown.edu:/data/yeounoh/RDMALockManager/$dest
+scp -r  $file yeounoh@bsn04.cs.brown.edu:/data/yeounoh/RDMALockManager/$dest
+scp -r  $file yeounoh@bsn06.cs.brown.edu:/data/yeounoh/RDMALockManager/$dest
+scp -r  $file yeounoh@bsn07.cs.brown.edu:/data/yeounoh/RDMALockManager/$dest

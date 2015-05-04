@@ -26,6 +26,7 @@ protected:
 	
 private:
 	int start_operation(ClientContext &ctx);	
+	int hold_lock();
 
 public:
 	static void usage (const char *argv0);

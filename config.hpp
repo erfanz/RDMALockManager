@@ -12,16 +12,16 @@
 #include <string>
 
 #define DEBUG_ENABLED (false)
-static const int	CLIENTS_CNT 	= 2;
+static const int	CLIENTS_CNT 	= 6;
 
 
-static const std::string	SERVER_ADDR		= "192.168.1.1";	// only relevant for Tranditional-SI
+static const std::string	SERVER_ADDR		= "192.168.0.1";	// only relevant for Tranditional-SI
 static const uint16_t		SERVER_TCP_PORT	= 45677;			// only relevant for Tranditional-SI
 static const int			SERVER_IB_PORT		= 1;	// only relevant for Tranditional-SI
 
 static const int	OPERATIONS_CNT 		= 100000;
 
-static const int	ITEM_CNT				= 10;		// Number of Items
+static const int	ITEM_CNT				= 2;		// Number of Items
 
 static const int	LOCK_OWNERSHIP_MEAN_USEC		= 0;	// the mean time to own a lock in micro sec  ;
 static const int	LOCK_OWNERSHIP_VARIANCE_USEC	= 0;	// the variance of time of holding a lock

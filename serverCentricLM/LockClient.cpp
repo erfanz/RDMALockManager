@@ -23,13 +23,19 @@
 
 int LockClient::start_operation (ClientContext &ctx) {
 	
-	struct timespec firstRequestTime, lastRequestTime;
+	struct timespec firstRequestTime, lastRequestTime, beforeAcquisition, afterAcquisition, beforeRelease, afterRelease;
 	char temp_char;
 
-	clock_gettime(CLOCK_REALTIME, &firstRequestTime); // Fire the  timer
+	
 
-	struct LockRequest req;
+	struct LockRequest req, req_release;
 	struct LockResponse res;
+	
+	double sumExclusiveAcqTime= 0.0, sumSharedAcqTime= 0.0, sumExclusiveRelTime= 0.0, sumSharedRelime= 0.0;
+	double acquisitionTime, releaseTime;
+	int exclusiveCount= 0, sharedCount= 0;
+	
+	clock_gettime(CLOCK_REALTIME, &firstRequestTime); // Fire the  timer	
 	
 	ctx.op_num = 0;
 	while (ctx.op_num  <  OPERATIONS_CNT) {
@@ -39,20 +45,44 @@ int LockClient::start_operation (ClientContext &ctx) {
 		// ************************************************************************
 		//	Client request a lock on the selected item and waits for a response.
 		select_item(req);
+		
+		clock_gettime(CLOCK_REALTIME, &beforeAcquisition); // Fire the  timer		
 		acquire_lock (ctx, req, res);
-
-
+		clock_gettime(CLOCK_REALTIME, &afterAcquisition);	// Fire the  timer
+		acquisitionTime = ( afterAcquisition.tv_sec - beforeAcquisition.tv_sec ) * 1E6 + ( afterAcquisition.tv_nsec - beforeAcquisition.tv_nsec )/1E3;
+		
+		// hold lock for a specified time period (in a specific way).
+		hold_lock();
+		
 		// ************************************************************************
 		//	Clients release the acquired lock.
-		req.request_type = LockRequest::RELEASE;
-		release_lock (ctx, req, res);
+		req_release.request_type = LockRequest::RELEASE;
+		clock_gettime(CLOCK_REALTIME, &beforeRelease); // Fire the  timer		
+		release_lock (ctx, req_release, res);
+		clock_gettime(CLOCK_REALTIME, &afterRelease);	// Fire the  timer
+		releaseTime = ( afterRelease.tv_sec - beforeRelease.tv_sec ) * 1E6 + ( afterRelease.tv_nsec - beforeRelease.tv_nsec )/1E3;
+		
+		if(req.request_type == LockRequest::EXCLUSIVE){
+			sumExclusiveAcqTime += acquisitionTime;
+			sumExclusiveRelTime += releaseTime; 
+			exclusiveCount++;
+		}
+		else if(req.request_type == LockRequest::SHARED){
+			sumSharedAcqTime += acquisitionTime; 
+			sumSharedRelime += releaseTime; 
+			sharedCount++;
+		}
 	}
+	clock_gettime(CLOCK_REALTIME, &lastRequestTime); // Fire the  timer
 
-	clock_gettime(CLOCK_REALTIME, &lastRequestTime);	// Fire the  timer
-
-	double nano_elapsed_time = ( lastRequestTime.tv_sec - firstRequestTime.tv_sec ) * 1E9 + ( lastRequestTime.tv_nsec - firstRequestTime.tv_nsec );
-	double L_P_MILISEC = (double)(OPERATIONS_CNT / (double)(nano_elapsed_time / 1000000));
-	std::cout << std::endl << "[Stat] Locks (acquire & release) per millisec: " <<  L_P_MILISEC << std::endl;
+	double micro_elapsed_time = ( lastRequestTime.tv_sec - firstRequestTime.tv_sec ) * 1E6 + ( lastRequestTime.tv_nsec - firstRequestTime.tv_nsec )/1E3;
+	double lock_per_sec = (double)(OPERATIONS_CNT / (double)(micro_elapsed_time / 1000000));
+	
+	std::cout << std::endl << "[Stat] Locks (acquire & release) per sec: 	" <<  lock_per_sec << std::endl;
+	std::cout << "[STAT] Avg time per Exclusive acquisition (us)	" << sumExclusiveAcqTime / exclusiveCount << std::endl;
+	std::cout << "[STAT] Avg time per Exclusive release (us)		" << sumExclusiveRelTime / exclusiveCount << std::endl;
+	std::cout << "[STAT] Avg time per Shared acquisition (us)		" << sumSharedAcqTime / sharedCount << std::endl;
+	std::cout << "[STAT] Avg time per Shared release (us)			" << sumSharedRelime / sharedCount << std::endl;
 
 	return 0;
 }
@@ -85,11 +115,12 @@ int LockClient::acquire_lock (ClientContext &ctx, struct LockRequest &req, struc
 		DEBUG_COUT("[Sent] LockRequest::Request (" << req.request_type << ") to LM.");
 		
 		TEST_NZ (sock_read(ctx.sockfd, (char *)&res, sizeof(struct LockResponse)));
-				if (res.response_type == LockResponse::GRANTED)
-					DEBUG_COUT("[Recv] " << req.request_type << " LockResponse (result: granted)");
-				else {
-					DEBUG_COUT("[Recv] " << req.request_type << "LockResponse (result: failed)");
-				}
+		if (res.response_type == LockResponse::GRANTED)
+			DEBUG_COUT("[Recv] " << req.request_type << " LockResponse (result: granted)");
+		else {
+			DEBUG_CERR("[Error] " << req.request_type << "LockResponse (result: failed)");
+		}
+				
 		return 0;
 	}
 	return 1;
@@ -109,6 +140,13 @@ int LockClient::release_lock (ClientContext &ctx, struct LockRequest &req, struc
 		return 0;
 	}
 	return 1;
+}
+
+int LockClient::hold_lock () { 
+	// hold onto lock for some pre-determined time
+	sleep_for_microsec(LOCK_OWNERSHIP_MEAN_USEC);
+	
+	return 0;
 }
 
 int LockClient::start_client () {	
