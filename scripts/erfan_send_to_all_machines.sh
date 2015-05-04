@@ -14,10 +14,10 @@ fi
 
 echo "sending file(s) to /data/erfanz/RDMALockManager/$dest"
 
-#scp -r  $file erfanz@bsn00.cs.brown.edu:/data/erfanz/RDMALockManager/$dest
+scp -r  $file erfanz@bsn00.cs.brown.edu:/data/erfanz/RDMALockManager/$dest
 scp -r  $file erfanz@bsn01.cs.brown.edu:/data/erfanz/RDMALockManager/$dest
-#scp -r  $file erfanz@bsn02.cs.brown.edu:/data/erfanz/RDMALockManager/$dest
-#scp -r  $file erfanz@bsn03.cs.brown.edu:/data/erfanz/RDMALockManager/$dest
-#scp -r  $file erfanz@bsn04.cs.brown.edu:/data/erfanz/RDMALockManager/$dest
-#scp -r  $file erfanz@bsn06.cs.brown.edu:/data/erfanz/RDMALockManager/$dest
-#scp -r  $file erfanz@bsn07.cs.brown.edu:/data/erfanz/RDMALockManager/$dest
+scp -r  $file erfanz@bsn02.cs.brown.edu:/data/erfanz/RDMALockManager/$dest
+scp -r  $file erfanz@bsn03.cs.brown.edu:/data/erfanz/RDMALockManager/$dest
+scp -r  $file erfanz@bsn04.cs.brown.edu:/data/erfanz/RDMALockManager/$dest
+scp -r  $file erfanz@bsn06.cs.brown.edu:/data/erfanz/RDMALockManager/$dest
+scp -r  $file erfanz@bsn07.cs.brown.edu:/data/erfanz/RDMALockManager/$dest

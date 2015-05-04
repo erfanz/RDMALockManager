@@ -319,6 +319,7 @@ struct ibv_port_attr* port_attr, struct ibv_pd **pd, struct ibv_cq **cq, struct	
 	struct	ibv_device *ib_dev = NULL;
 	int		num_devices;
 	//struct	ibv_comp_channel *comp_channel;
+	
 
 	// get device names in the system
 	TEST_Z(dev_list = ibv_get_device_list (&num_devices));
@@ -334,7 +335,8 @@ struct ibv_port_attr* port_attr, struct ibv_pd **pd, struct ibv_cq **cq, struct	
 	ibv_free_device_list (dev_list);
 	dev_list = NULL;
 	ib_dev = NULL;
-	
+
+	DEBUG_COUT("port: " << ib_port);
 	TEST_NZ (ibv_query_port (*ib_ctx, ib_port, port_attr));
 
 	TEST_Z(*pd = ibv_alloc_pd (*ib_ctx));		// allocate Protection Domain
@@ -343,12 +345,10 @@ struct ibv_port_attr* port_attr, struct ibv_pd **pd, struct ibv_cq **cq, struct	
 	//TEST_Z(comp_channel = ibv_create_comp_channel(*ib_ctx));
 	TEST_Z(*comp_channel = ibv_create_comp_channel(*ib_ctx));
 	
-	
 	//TEST_Z(*cq = ibv_create_cq (*ib_ctx, cq_size, NULL, comp_channel, 0));
 	TEST_Z(*cq = ibv_create_cq (*ib_ctx, cq_size, NULL, *comp_channel, 0));
 	
 	TEST_NZ (ibv_req_notify_cq(*cq, 0));
-	
 	return 0;
 }
 
