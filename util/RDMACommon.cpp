@@ -191,6 +191,50 @@ int RDMACommon::create_queuepair(struct ibv_context *ib_ctx, struct ibv_pd *pd, 
 	return 0;
 }
 
+int RDMACommon::create_queuepair2(struct ibv_context *ib_ctx, struct ibv_pd *pd, struct ibv_cq *cq_send, struct ibv_cq *cq_receive, struct ibv_qp **qp)
+{
+	struct ibv_exp_device_attr dev_attr;
+	struct ibv_exp_qp_init_attr	attr;
+	
+	memset(&dev_attr, 0, sizeof(dev_attr));
+	dev_attr.comp_mask |= IBV_EXP_DEVICE_ATTR_EXT_ATOMIC_ARGS | IBV_EXP_DEVICE_ATTR_EXP_CAP_FLAGS;
+	if (ibv_exp_query_device(ib_ctx, &dev_attr)) {
+		std::cerr << "ibv_exp_query_device failed" << std::endl;
+		return -1;
+	}
+
+	memset(&attr, 0, sizeof(struct ibv_exp_qp_init_attr));
+	attr.pd = pd;
+	attr.send_cq = cq_send;
+	attr.recv_cq = cq_receive;
+	attr.sq_sig_all = 0;	// In every WR, it must be decided whether to generate a WC or not
+	attr.cap.max_send_wr  = RDMA_MAX_WR;
+	attr.cap.max_send_sge = RDMA_MAX_SGE;
+	attr.cap.max_inline_data = 0;
+	attr.cap.max_recv_wr  = 2 * RDMA_MAX_WR;
+	attr.cap.max_recv_sge = RDMA_MAX_SGE;
+	//attr.max_atomic_arg = pow(2,5);
+	attr.max_atomic_arg = 32;
+	attr.exp_create_flags = IBV_EXP_QP_CREATE_ATOMIC_BE_REPLY;
+	attr.comp_mask = IBV_EXP_QP_INIT_ATTR_CREATE_FLAGS | IBV_EXP_QP_INIT_ATTR_PD;
+	attr.comp_mask |= IBV_EXP_QP_INIT_ATTR_ATOMICS_ARG;
+	attr.srq = NULL;
+	attr.qp_type = IBV_QPT_RC;
+	
+	(*qp) = ibv_exp_create_qp(ib_ctx, &attr);
+   	if (!(*qp))
+	{
+		std::cerr << "failed to create QP" << std::endl;
+		return -1;
+	}
+	DEBUG_COUT ("[Conn] QP created, QP number=0x" << (*qp)->qp_num);
+	//fprintf (stdout, "QP was created, QP number=0x%x\n", (*qp)->qp_num);
+	
+	return 0;
+}
+
+
+
 int RDMACommon::modify_qp_to_init (int ib_port, struct ibv_qp *qp)
 {
 	struct ibv_qp_attr attr;
@@ -351,6 +395,52 @@ struct ibv_port_attr* port_attr, struct ibv_pd **pd, struct ibv_cq **cq, struct	
 	TEST_NZ (ibv_req_notify_cq(*cq, 0));
 	return 0;
 }
+
+
+int RDMACommon::build_connection2(int ib_port, struct ibv_context** ib_ctx,
+struct ibv_port_attr* port_attr, struct ibv_pd **pd, struct ibv_cq **cq_send, struct ibv_cq **cq_receive, struct	ibv_comp_channel **comp_channel_send, struct	ibv_comp_channel **comp_channel_receive,  int cq_size)
+{
+	struct	ibv_device **dev_list = NULL;
+	struct	ibv_device *ib_dev = NULL;
+	int		num_devices;
+	//struct	ibv_comp_channel *comp_channel;
+	
+
+	// get device names in the system
+	TEST_Z(dev_list = ibv_get_device_list (&num_devices));
+	TEST_Z(num_devices); // if there isn't any IB device in host
+
+	// select the first device
+	const char *dev_name = strdup (ibv_get_device_name (dev_list[0]));
+	TEST_Z(ib_dev = dev_list[0]);	// if the device wasn't found in host
+	
+	TEST_Z(*ib_ctx = ibv_open_device (ib_dev));		// get device handle
+
+	// We are now done with device list, free it
+	ibv_free_device_list (dev_list);
+	dev_list = NULL;
+	ib_dev = NULL;
+
+	DEBUG_COUT("port: " << ib_port);
+	TEST_NZ (ibv_query_port (*ib_ctx, ib_port, port_attr));
+
+	TEST_Z(*pd = ibv_alloc_pd (*ib_ctx));		// allocate Protection Domain
+
+	// Create completion channel and completion queue
+	//TEST_Z(comp_channel = ibv_create_comp_channel(*ib_ctx));
+	TEST_Z(*comp_channel_send = ibv_create_comp_channel(*ib_ctx));
+	TEST_Z(*comp_channel_receive = ibv_create_comp_channel(*ib_ctx));
+	
+	//TEST_Z(*cq = ibv_create_cq (*ib_ctx, cq_size, NULL, comp_channel, 0));
+	TEST_Z(*cq_send = ibv_create_cq (*ib_ctx, cq_size, NULL, *comp_channel_send, 0));
+	TEST_Z(*cq_receive = ibv_create_cq (*ib_ctx, cq_size, NULL, *comp_channel_receive, 0));
+	
+	
+	TEST_NZ (ibv_req_notify_cq(*cq_send, 0));
+	TEST_NZ (ibv_req_notify_cq(*cq_receive, 0));
+	return 0;
+}
+
 
 int RDMACommon::connect_qp (struct ibv_qp **qp, int ib_port, uint16_t lid, int sockfd)
 {

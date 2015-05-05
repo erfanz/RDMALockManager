@@ -25,6 +25,7 @@
 std::list <QueuedRequest> SRLockServer::list_array[ITEM_CNT];
 std::mutex SRLockServer::list_mutex[ITEM_CNT];
 
+
 void* SRLockServer::handle_client(void *param) {
     SRServerContext *ctx = (SRServerContext *) param;
     char temp_char;
@@ -57,30 +58,30 @@ int SRLockServer::start_operation(SRServerContext &ctx) {
 		ctx.op_num = ctx.op_num + 1;
 		DEBUG_COUT (std::endl << "[Info] Waiting for operation #" << ctx.op_num/2 << " from client " << ctx.sockfd);
 		
-		DEBUG_COUT ("[INFO] Queue/start ------------------------" << ctx.sockfd);
-		for (int i=0;i<ITEM_CNT;i++){
-			list_mutex[i].lock();
-			std::list<QueuedRequest> *list_p = &list_array[i];
-			std::cout << i << ":   " ;
-			for (std::list<QueuedRequest>::iterator itr=list_p->begin(); itr != list_p->end();++itr){
-				std::cout << (*itr).ctx->sockfd << "(" << (*itr).req.request_type << ") " ;
-			}
-			std::cout << std::endl;
-			list_mutex[i].unlock();
-		}
+		// DEBUG_COUT ("[INFO] Queue/start ------------------------" << ctx.sockfd);
+// 		for (int i=0;i<ITEM_CNT;i++){
+// 			list_mutex[i].lock();
+// 			std::list<QueuedRequest> *list_p = &list_array[i];
+// 			std::cout << i << ":   " ;
+// 			for (std::list<QueuedRequest>::iterator itr=list_p->begin(); itr != list_p->end();++itr){
+// 				std::cout << (*itr).ctx->sockfd << "(" << (*itr).req.request_type << ") " ;
+// 			}
+// 			std::cout << std::endl;
+// 			list_mutex[i].unlock();
+// 		}
 		
 
 		// ************************************************************************
 		// Step 1: Waits for client to post a lock request
 		//TEST_NZ (sock_read(ctx.sockfd, (char *)&(req), sizeof(struct LockRequest)));
-		TEST_NZ (RDMACommon::poll_completion(ctx.cq));	// Receive LockRequest
+		TEST_NZ (RDMACommon::poll_completion(ctx.cq_receive));	// Receive LockRequest
 		DEBUG_COUT ("[Recv] LockRequest from client" << ctx.sockfd);
-		
+		DEBUG_COUT ("+repeat ([Recv] LockRequest from client" << ctx.sockfd << ")");
 		
 		// ************************************************************************
 		// Step 2: Registers client's request (SHARED | EXCLUSIVE | RELEASE)
 		// Grant a lock for the front of the queue and (or send a RELEASED message) for client
-		TEST_NZ (register_request(ctx,ctx.lock_request,ctx.lock_response));
+		TEST_NZ (register_request(ctx));
 		
 	}
 
@@ -97,21 +98,26 @@ int SRLockServer::start_operation(SRServerContext &ctx) {
 	return 0;
 }
 
-int SRLockServer::register_request (SRServerContext &ctx, struct LockRequest &req, struct LockResponse &res) {
-	if (req.request_type == LockRequest::RELEASE)
-		DEBUG_COUT("+Client " << ctx.sockfd << " lock RELEASE request item " << req.request_item);
+int SRLockServer::register_request (SRServerContext &ctx) {
+	DEBUG_COUT("+++ Entering register_request");
+	if (ctx.lock_request.request_type == LockRequest::RELEASE)
+		DEBUG_COUT("+Client " << ctx.sockfd << " lock RELEASE request item " << ctx.lock_request.request_item);
 	else
-		DEBUG_COUT("+Client " << ctx.sockfd << " lock type " << req.request_type << " request item " << req.request_item);
+		DEBUG_COUT("+Client " << ctx.sockfd << " lock type " << ctx.lock_request.request_type << " request item " << ctx.lock_request.request_item);
 	
-	std::list<QueuedRequest>* list_p = &list_array[req.request_item];
-	if (req.request_type == LockRequest::RELEASE) {	
+	// ctx.lock_request can change in the middle of the following procedures.
+	int current_item = ctx.lock_request.request_item;
+	int current_lock_mode = ctx.lock_request.request_type;
+	
+	std::list<QueuedRequest>* list_p = &list_array[ctx.lock_request.request_item];
+	if (ctx.lock_request.request_type == LockRequest::RELEASE) {	
 		
-		list_mutex[req.request_item].lock();
-		DEBUG_COUT("Client " << ctx.sockfd << " got the lock on item " << req.request_item);
+		list_mutex[ctx.lock_request.request_item].lock();
+		DEBUG_COUT("+Client " << ctx.sockfd << " got the lock on item " << ctx.lock_request.request_item);
 		
 		if (list_p->empty()){
-			list_mutex[req.request_item].unlock();
-			DEBUG_COUT("Client " << ctx.sockfd << " unlock the mutex on item " << req.request_item);
+			list_mutex[ctx.lock_request.request_item].unlock();
+			DEBUG_COUT("+Client " << ctx.sockfd << " unlock the mutex on item " << ctx.lock_request.request_item);
 			
 			
 			return 1; //error
@@ -130,116 +136,122 @@ int SRLockServer::register_request (SRServerContext &ctx, struct LockRequest &re
 						grant = true;
 					}
 					
-					res.response_type = LockResponse::RELEASED;
+					ctx.lock_response.response_type = LockResponse::RELEASED;
 					
-					
-					DEBUG_COUT("+Erasing item " << req.request_item << " lock for client " << ((*itr).ctx->sockfd));
+					DEBUG_COUT("+Erasing item " << ctx.lock_request.request_item << " lock for client " << ctx.sockfd);
 					
 					itr = list_p->erase(itr); //delete causes double free error; erase(itr) takes care of memory.
 					list_size = list_p->size(); //update list_size
-					DEBUG_COUT("+Erased; current list size: " << list_size << " in client " << ctx.sockfd);
+					DEBUG_COUT("+Erased; current list size: " << list_size << " in client " << ctx.sockfd);	
 					
-					DEBUG_COUT("Just Checking 1 (client, item): " << ctx.sockfd << "  " << req.request_item);
-					
-					
-					
-					TEST_NZ (RDMACommon::post_RECEIVE(ctx.qp, ctx.lock_req_mr, (uintptr_t)&req, sizeof(struct LockRequest))); 
+					//this may change the content of ctx.lock_request or req (lock_req_mr)?
+					TEST_NZ (RDMACommon::post_RECEIVE(ctx.qp, ctx.lock_req_mr, (uintptr_t)&ctx.lock_request, sizeof(struct LockRequest))); 
 					DEBUG_COUT("[Info] receive posted to the queue of " << ctx.sockfd);
 					
-					DEBUG_COUT("Just Checking 2 (client, item): " << ctx.sockfd << "  " << req.request_item);
-					
-		
+							
 					// TEST_NZ (sock_write(ctx.sockfd, (char *)&(res), sizeof(struct LockResponse)));
-					TEST_NZ (RDMACommon::post_SEND(ctx.qp, ctx.lock_res_mr, (uintptr_t)&res, sizeof(struct LockResponse), true));
+					TEST_NZ (RDMACommon::post_SEND(ctx.qp, ctx.lock_res_mr, (uintptr_t)&ctx.lock_response, sizeof(struct LockResponse), true));
+					TEST_NZ (RDMACommon::poll_completion(ctx.cq_send));	// Ack for SEND -> this registered a duplicate request from the client
 					
-					DEBUG_COUT("Just Checking 3 (client, item): " << ctx.sockfd << "  " << req.request_item);
-					
-					TEST_NZ (RDMACommon::poll_completion(ctx.cq));	// Ack for SEND
-					
-					DEBUG_COUT("Just Checking 4 (client, item): " << ctx.sockfd << "  " << req.request_item);
+					DEBUG_COUT("[Sent] LockResponse RELEASE to client " << ctx.sockfd); // not received
 					
 					
-					DEBUG_COUT("[Sent] LockResponse RELEASE to client " << (ctx.sockfd));
+					// ----------------------------------------------------------------------------------------
+					// *** ctx.lock_request can change from this point! (use current_item & current_lock_mode).
+					// ----------------------------------------------------------------------------------------
 					
 					//if released lock was the front, then grant the lock to the next one, if any.
 					if(grant){
-						front = list_p->front(); //update front
+						DEBUG_COUT("+Granting after releasing the lock for (client,item,mode): " << ctx.sockfd << ", " << current_item << ", " << front.req.request_type);
+						
+						front = list_p->front(); //update front (previously the second request on the list)
+						DEBUG_COUT("+new front of the list to be granted is (client,item,mode): " << front.ctx->sockfd << ", " << front.req.request_item << ", " << front.req.request_type);
+						
+						int front_current_item = front.ctx->lock_request.request_item;
+						int front_current_lock_mode = front.ctx->lock_request.request_type;
 						
 						//res.response_type = LockResponse::GRANTED;
 						front.ctx->lock_response.response_type = LockResponse::GRANTED;
 	
 						TEST_NZ (RDMACommon::post_RECEIVE(front.ctx->qp, front.ctx->lock_req_mr, (uintptr_t)&front.ctx->lock_request, sizeof(struct LockRequest))); 
-						DEBUG_COUT("[Info] RECIVE posted by client " << ctx.sockfd  << " on behalf of " << front.ctx->sockfd << " to its queue (for item " << req.request_item << ")");
+						DEBUG_COUT("[Info] RECEIVE posted by client " << ctx.sockfd  << " on behalf of " << front.ctx->sockfd << " to its queue (for item " << front.req.request_item << ")");
 						
 						//TEST_NZ (sock_write(front.ctx->sockfd, (char *)&(res), sizeof(struct LockResponse)));
 						TEST_NZ (RDMACommon::post_SEND(front.ctx->qp, front.ctx->lock_res_mr, (uintptr_t)&front.ctx->lock_response, sizeof(struct LockResponse), true));
-						DEBUG_COUT("[Info] SENT posted by client " << ctx.sockfd  << " on behalf of " << front.ctx->sockfd << " to its queue (for item " << req.request_item << ")");
+						DEBUG_COUT("[Info] SENT posted by client " << ctx.sockfd  << " on behalf of " << front.ctx->sockfd << " to its queue (for item " << front.req.request_item << ")");
+						
+						TEST_NZ (RDMACommon::poll_completion(front.ctx->cq_send));	// Ack for SEND (false)
+						//DEBUG_COUT("[Info] POLL posted by client " << ctx.sockfd  << " on behalf of " << front.ctx->sockfd << " to its queue (for item " << front.req.request_item << ")"); 
+						
+						// ----------------------------------------------------------------------------------------
+						// *** front.ctx.lock_request can change from this point! (use current_item & current_lock_mode).
+						// ----------------------------------------------------------------------------------------
 						
 						
-						TEST_NZ (RDMACommon::poll_completion(front.ctx->cq));	// Ack for SEND
-						DEBUG_COUT("[Info] POLL posted by client " << ctx.sockfd  << " on behalf of " << front.ctx->sockfd << " to its queue (for item " << req.request_item << ")");
-						
-						
-						DEBUG_COUT("[Sent] LockResponse " << front.req.request_type << " to client " << (front.ctx->sockfd) <<  " (for item " << req.request_item << ")");
+						DEBUG_COUT("[Sent] LockResponse to client " << (front.ctx->sockfd) <<  " (for item " << front_current_item << ")");
 						
 						
 						if (front.req.request_type == LockRequest::SHARED)
-							grant_shared_locks(ctx, front.req,res);
+							grant_shared_locks(*front.ctx);
 					}
 					break;
 				}
 				else
 					++itr;
 			}
-			list_mutex[req.request_item].unlock();
-			DEBUG_COUT("Client " << ctx.sockfd << " unlock the mutex on item " << req.request_item);
+			list_mutex[current_item].unlock();
+			DEBUG_COUT("Client " << ctx.sockfd << " unlock the mutex on item " << current_item);
 			
 			
 			return 0;
 		}
 	}
 	else {	// Lock request
-		DEBUG_COUT("+Registering request" << ctx.sockfd);
+		
+		DEBUG_COUT("+Registering request from client " << ctx.sockfd << ", (lock mode, item): " << ctx.lock_request.request_type << ", " << ctx.lock_request.request_item);
 		QueuedRequest* queued_req = new QueuedRequest;
-		queued_req->ctx = &ctx;
-		queued_req->req = req;
+		queued_req->ctx = &ctx; //SRServerContext
+		queued_req->req = ctx.lock_request;
 		
 		
-		list_mutex[req.request_item].lock();
-		DEBUG_COUT("Client " << ctx.sockfd << " got the lock on item " << req.request_item);
+		
+		list_mutex[ctx.lock_request.request_item].lock();
+		DEBUG_COUT("+Client " << ctx.sockfd << " got the lock on item " << ctx.lock_request.request_item << " with mode " << ctx.lock_request.request_type);
 		
 		list_p->push_back(*queued_req);
 		
 		
-		DEBUG_COUT("+Registered; current list size for item " << req.request_item << ": " << (list_p->size()) << " in client " << ctx.sockfd);
+		DEBUG_COUT("+Registered; current list size for item " << ctx.lock_request.request_item << ": " << (list_p->size()) << " in client " << ctx.sockfd);
 		
 		//if registered request is at the front, then grant it the lock.
 		if (&ctx == list_p->front().ctx) { 
 			
-			res.response_type = LockResponse::GRANTED;
+			ctx.lock_response.response_type = LockResponse::GRANTED;
 			
-			struct QueuedRequest front = list_p->front();
-			
-			TEST_NZ (RDMACommon::post_RECEIVE(front.ctx->qp, front.ctx->lock_req_mr, (uintptr_t)&front.ctx->lock_request, sizeof(struct LockRequest))); 
-			DEBUG_COUT("[Info] RECEIVE posted by the client " << ctx.sockfd << " for self (" << front.ctx->sockfd << ") to the queue");
+			TEST_NZ (RDMACommon::post_RECEIVE(ctx.qp, ctx.lock_req_mr, (uintptr_t)&ctx.lock_request, sizeof(struct LockRequest))); 
+			DEBUG_COUT("[Info] RECEIVE posted by the client " << ctx.sockfd << " for self to the queue");
 			
 			//TEST_NZ (sock_write(front.ctx->sockfd, (char *)&(res), sizeof(struct LockResponse)));
-			TEST_NZ (RDMACommon::post_SEND(front.ctx->qp, front.ctx->lock_res_mr, (uintptr_t)&front.ctx->lock_response, sizeof(struct LockResponse), true));
-			DEBUG_COUT("[Info] SENT posted by the client " << ctx.sockfd << " for self (" << front.ctx->sockfd << ") to the queue");
+			TEST_NZ (RDMACommon::post_SEND(ctx.qp, ctx.lock_res_mr, (uintptr_t)&ctx.lock_response, sizeof(struct LockResponse), true));
+			DEBUG_COUT("[Info] SENT posted by the client " << ctx.sockfd << " for self to the queue");
 			
-			TEST_NZ (RDMACommon::poll_completion(front.ctx->cq));	// Ack for SEND
-			DEBUG_COUT("[Info] POLL posted by the client " << ctx.sockfd << " for self (" << front.ctx->sockfd << ") to the queue");
+			TEST_NZ (RDMACommon::poll_completion(ctx.cq_send));	// Ack for SEND
+			DEBUG_COUT("[Info] POLL posted by the client " << ctx.sockfd << " for self (" << ctx.sockfd << ") to the queue");
 			
-			DEBUG_COUT("[Sent] LockResponse " << front.req.request_type << " to client " << (front.ctx->sockfd));
+			// ----------------------------------------------------------------------------------------
+			// *** ctx.lock_request can change from this point! (use current_item & current_lock_mode).
+			// ----------------------------------------------------------------------------------------
 			
-			if(front.req.request_type == LockRequest::SHARED)
-				grant_shared_locks(ctx, front.req,res);
+			DEBUG_COUT("[Sent] LockResponse " << current_lock_mode << " to client " << (ctx.sockfd));
+			
+			if(ctx.lock_request.request_type == LockRequest::SHARED)
+				grant_shared_locks(ctx);
 		}
 		else {
-			DEBUG_COUT("Registered Item " << req.request_item << " lock is not granted, for client " << ctx.sockfd);
+			DEBUG_COUT("Registered Item " << current_item << " lock is not granted, for client " << ctx.sockfd);
 		}
-		list_mutex[req.request_item].unlock();
-		DEBUG_COUT("Client " << ctx.sockfd << " unlock the mutex on item " << req.request_item);
+		list_mutex[current_item].unlock();
+		DEBUG_COUT("+Client " << ctx.sockfd << " unlock the mutex on item " << current_item);
 		
 		
 		return 0;
@@ -248,35 +260,39 @@ int SRLockServer::register_request (SRServerContext &ctx, struct LockRequest &re
 	return 1;
 }
 
-int SRLockServer::grant_shared_locks (SRServerContext &ctx, struct LockRequest &req, struct LockResponse &res) {
-	std::list<QueuedRequest>* list_p = &list_array[req.request_item];
+int SRLockServer::grant_shared_locks (SRServerContext &ctx) {
 	
-	if (req.request_type == LockRequest::RELEASE) {
+	std::list<QueuedRequest>* list_p = &list_array[ctx.lock_request.request_item];
+	
+	if (ctx.lock_request.request_type == LockRequest::RELEASE) {
 		return 1; //error
 	} //else, queue should not be empty
 	else { //grant lock to the front request in the queue (this may not be ctx)
-		res.response_type = LockResponse::GRANTED;
+		ctx.lock_response.response_type = LockResponse::GRANTED;
 				
 		struct QueuedRequest front = list_p->front();
 		
 		if (list_p->size() > 1 && front.req.request_type == LockRequest::SHARED){
-			DEBUG_COUT("+Granting other shared locks on item " << req.request_item);
+			DEBUG_COUT("+Granting other shared locks on item " << ctx.lock_request.request_item);
 			std::list<QueuedRequest>::iterator itr=list_p->begin();
 			++itr; //skip front
 			for (; itr != list_p->end();++itr){
+				int current_item = (*itr).req.request_item;
+				int current_lock_mode = (*itr).req.request_type;
+				
 				if ((*itr).req.request_type == LockRequest::EXCLUSIVE){
 					DEBUG_COUT("+Encounted EXCLUSIVE");
 					break;
 				}
 				else {
 					TEST_NZ (RDMACommon::post_RECEIVE((*itr).ctx->qp, (*itr).ctx->lock_req_mr, (uintptr_t)&(*itr).ctx->lock_request, sizeof(struct LockRequest))); 
-					DEBUG_COUT("[Info] RECEIVE posted by the client " << ctx.sockfd << " for  client " << (*itr).ctx->sockfd << " to the queue");
+					DEBUG_COUT("[Info] RECEIVE posted for client " << (*itr).ctx->sockfd << " to the queue (in grant_shared_locks)");
 					
 					//TEST_NZ (sock_write((*itr).ctx->sockfd, (char *)&(res), sizeof(struct LockResponse)));
 					TEST_NZ (RDMACommon::post_SEND((*itr).ctx->qp, (*itr).ctx->lock_res_mr, (uintptr_t)&(*itr).ctx->lock_response, sizeof(struct LockResponse), true));
-					DEBUG_COUT("[Info] SEND posted by the client " << ctx.sockfd << " for  client " << (*itr).ctx->sockfd << " to the queue");
-					TEST_NZ (RDMACommon::poll_completion((*itr).ctx->cq));	// Ack for SEND
-					DEBUG_COUT("[Info] POLL posted by the client " << ctx.sockfd << " for  client " << (*itr).ctx->sockfd << " to the queue");
+					DEBUG_COUT("[Info] SEND posted for  client " << (*itr).ctx->sockfd << " to the queue (in grant_shared_locks)");
+					TEST_NZ (RDMACommon::poll_completion((*itr).ctx->cq_send));	// Ack for SEND
+					//DEBUG_COUT("[Info] POLL posted by the client " << ctx.sockfd << " for  client " << (*itr).ctx->sockfd << " to the queue");
 					
 					DEBUG_COUT("+[Sent] LockResponse " << (*itr).req.request_type << " to client " << ((*itr).ctx->sockfd));
 				}

@@ -34,8 +34,8 @@ class SRLockServer { //not extending BaseServer (removed)
 protected:
 	int server_sockfd;
 	
-	static int register_request (SRServerContext &ctx, struct LockRequest &req, struct LockResponse &res);
-	static int grant_shared_locks (SRServerContext &ctx, struct LockRequest &req, struct LockResponse &res);
+	static int register_request (SRServerContext &ctx);
+	static int grant_shared_locks (SRServerContext &ctx);
 	int destroy_resources ();
 	
 private:

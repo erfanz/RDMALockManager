@@ -121,9 +121,9 @@ int SRLockClient::acquire_lock (SRClientContext &ctx, struct LockRequest &req, s
 		
 		// TEST_NZ (sock_write(ctx.sockfd, (char *)&req, sizeof(struct LockRequest)));
 		TEST_NZ (RDMACommon::post_SEND(ctx.qp, ctx.lock_req_mr, (uintptr_t)&req, sizeof(struct LockRequest), true));
-		TEST_NZ (RDMACommon::poll_completion(ctx.cq));	// Ack for SEND
+		TEST_NZ (RDMACommon::poll_completion(ctx.cq));	// Ack for SEND (false)
 			
-		DEBUG_COUT("[Sent] LockRequest::Request (" << req.request_type << ") to LM.");
+		DEBUG_COUT("[Sent] LockRequest::Request (" << req.request_type << ", " << req.request_item << ") to LM.");
 		
 		//TEST_NZ (sock_read(ctx.sockfd, (char *)&res, sizeof(struct LockResponse)));
 		TEST_NZ (RDMACommon::poll_completion(ctx.cq));	// Receive LockResponse
@@ -131,7 +131,7 @@ int SRLockClient::acquire_lock (SRClientContext &ctx, struct LockRequest &req, s
 		if (res.response_type == LockResponse::GRANTED)
 			DEBUG_COUT("[Recv] " << req.request_type << " LockResponse (result: granted)");
 		else {
-			DEBUG_CERR("[Error] " << req.request_type << "LockResponse (result: failed)");
+			DEBUG_COUT("[Error] " << req.request_type << " LockResponse result: " << res.response_type );
 		}
 				
 		return 0;
@@ -146,7 +146,7 @@ int SRLockClient::release_lock (SRClientContext &ctx, struct LockRequest &req, s
 		
 		//TEST_NZ (sock_write(ctx.sockfd, (char *)&req, sizeof(struct LockRequest)));
 		TEST_NZ (RDMACommon::post_SEND(ctx.qp, ctx.lock_req_mr, (uintptr_t)&req, sizeof(struct LockRequest), true));
-		TEST_NZ (RDMACommon::poll_completion(ctx.cq));	// Ack for SEND
+		TEST_NZ (RDMACommon::poll_completion(ctx.cq));	// Ack for SEND (false)
 			
 		DEBUG_COUT("[Sent] LockRequest::Request (RELEASE) to LM.");
 		
@@ -156,7 +156,7 @@ int SRLockClient::release_lock (SRClientContext &ctx, struct LockRequest &req, s
 		if (res.response_type == LockResponse::RELEASED)
 			DEBUG_COUT("[Recv] RELEASE LockResponse (result: released)");
 		else {
-			DEBUG_COUT("[Recv] RELEASE LockResponse (result: failed)");
+			DEBUG_COUT("[Error] RELEASE LockResponse result: " << res.response_type);
 		}
 		return 0;
 	}

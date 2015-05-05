@@ -23,6 +23,13 @@ public:
     // SRClientContext		client_ctx;
 	
 	int op_num; //operations (e.g., lock acquisition)
+	
+	struct	ibv_cq *cq_send;				/* CQ handle for SEND queue */
+	struct	ibv_cq *cq_receive;				/* CQ handle for RECEIVE queue */
+	
+	struct	ibv_comp_channel *comp_channel_send;		/* CQ channel */
+	struct	ibv_comp_channel *comp_channel_receive;		/* CQ channel */
+		
     
 	std::string client_ip;
 	int client_port;
@@ -35,6 +42,7 @@ public:
 	struct LockRequest lock_request;
 	struct LockResponse lock_response;
 	
+	int create_context();
     int register_memory ();
     int destroy_context ();
 };
