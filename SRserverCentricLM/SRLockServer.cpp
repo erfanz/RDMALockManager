@@ -20,6 +20,7 @@
 #include <iostream>
 #include <netinet/tcp.h>	// for setsockopt
 #include "../util/RDMACommon.hpp"	// for RDMA verbs
+#include <sys/resource.h>	// getrusage()
 
 
 std::list <QueuedRequest> SRLockServer::list_array[ITEM_CNT];
@@ -44,11 +45,6 @@ void* SRLockServer::handle_client(void *param) {
 int SRLockServer::start_operation(SRServerContext &ctx) {
 	//start operation for each client connection
 	char	temp_char;
-
-	struct timespec firstRequestTime, lastRequestTime;	// for calculating LPMS
-	//double avg_lock = 0;
-
-	clock_gettime(CLOCK_REALTIME, &firstRequestTime);	// Fire the  timer
 
 	struct LockRequest req;
 	struct LockResponse res;
@@ -76,7 +72,6 @@ int SRLockServer::start_operation(SRServerContext &ctx) {
 		//TEST_NZ (sock_read(ctx.sockfd, (char *)&(req), sizeof(struct LockRequest)));
 		TEST_NZ (RDMACommon::poll_completion(ctx.cq_receive));	// Receive LockRequest
 		DEBUG_COUT ("[Recv] LockRequest from client" << ctx.sockfd);
-		DEBUG_COUT ("+repeat ([Recv] LockRequest from client" << ctx.sockfd << ")");
 		
 		// ************************************************************************
 		// Step 2: Registers client's request (SHARED | EXCLUSIVE | RELEASE)
@@ -85,21 +80,12 @@ int SRLockServer::start_operation(SRServerContext &ctx) {
 		
 	}
 
-	clock_gettime(CLOCK_REALTIME, &lastRequestTime);	// Fire the  timer
-	double micro_elapsed_time = ( ( lastRequestTime.tv_sec - firstRequestTime.tv_sec ) * 1E9 + ( lastRequestTime.tv_nsec - firstRequestTime.tv_nsec ) ) / 1E3;
-	//avg_lock /= 1000;
-
-	std::cout << std::endl << "Total Elapsed time (u sec): " << micro_elapsed_time << std::endl;
-
-	//std::cout << "[Stat] Avg lock (u sec):            	" << (double)avg_lock / committed_cnt << std::endl;
-
 	DEBUG_COUT (std::endl << "[Info] Successfully executed all operations of client");
 
 	return 0;
 }
 
 int SRLockServer::register_request (SRServerContext &ctx) {
-	DEBUG_COUT("+++ Entering register_request");
 	if (ctx.lock_request.request_type == LockRequest::RELEASE)
 		DEBUG_COUT("+Client " << ctx.sockfd << " lock RELEASE request item " << ctx.lock_request.request_item);
 	else
@@ -191,8 +177,8 @@ int SRLockServer::register_request (SRServerContext &ctx) {
 						DEBUG_COUT("[Sent] LockResponse to client " << (front.ctx->sockfd) <<  " (for item " << front_current_item << ")");
 						
 						
-						if (front.req.request_type == LockRequest::SHARED)
-							grant_shared_locks(*front.ctx);
+						// if (front.req.request_type == LockRequest::SHARED)
+// 							grant_shared_locks(*front.ctx);
 					}
 					break;
 				}
@@ -210,9 +196,11 @@ int SRLockServer::register_request (SRServerContext &ctx) {
 		
 		DEBUG_COUT("+Registering request from client " << ctx.sockfd << ", (lock mode, item): " << ctx.lock_request.request_type << ", " << ctx.lock_request.request_item);
 		QueuedRequest* queued_req = new QueuedRequest;
+		DEBUG_COUT("+1repeat");
 		queued_req->ctx = &ctx; //SRServerContext
+		DEBUG_COUT("+2repeat");
 		queued_req->req = ctx.lock_request;
-		
+		DEBUG_COUT("+3repeat");
 		
 		
 		list_mutex[ctx.lock_request.request_item].lock();
@@ -244,8 +232,8 @@ int SRLockServer::register_request (SRServerContext &ctx) {
 			
 			DEBUG_COUT("[Sent] LockResponse " << current_lock_mode << " to client " << (ctx.sockfd));
 			
-			if(ctx.lock_request.request_type == LockRequest::SHARED)
-				grant_shared_locks(ctx);
+			// if(ctx.lock_request.request_type == LockRequest::SHARED)
+// 				grant_shared_locks(ctx);
 		}
 		else {
 			DEBUG_COUT("Registered Item " << current_item << " lock is not granted, for client " << ctx.sockfd);
@@ -329,7 +317,7 @@ int SRLockServer::start_server () {
 		//ctx[c].client_ip = "";
 		//ctx[c].client_ip	+= std::string(inet_ntoa (returned_addr.sin_addr));
 		//ctx[c].client_port	= (int) ntohs(returned_addr.sin_port);
-		std::cout << "[Conn] Received client " << c << " (" << ctx[c].client_ip << ", " << ctx[c].client_port << ") on sock " << ctx[c].sockfd << std::endl;	
+		//std::cout << "[Conn] Received client " << c << " (" << ctx[c].client_ip << ", " << ctx[c].client_port << ") on sock " << ctx[c].sockfd << std::endl;	
 		
 		ctx[c].ib_port = SERVER_IB_PORT;
 		TEST_NZ (ctx[c].create_context());
@@ -347,6 +335,15 @@ int SRLockServer::start_server () {
     
 	std::cout << "[Info] Established connection to all " << CLIENTS_CNT << " client(s)." << std::endl; 
     
+	
+	struct timespec firstRequestTime, lastRequestTime;	// for calculating LPMS
+    
+	struct rusage usage;
+	struct timeval start_user_usage, start_kernel_usage, end_user_usage, end_kernel_usage;
+	clock_gettime(CLOCK_REALTIME, &firstRequestTime);	// Fire the  timer
+	getrusage(RUSAGE_SELF, &usage);
+	start_kernel_usage = usage.ru_stime;
+	start_user_usage = usage.ru_utime;
     
 	for (int c = 0; c < CLIENTS_CNT; c++) {
 		pthread_create(&master_threads[c], NULL, SRLockServer::handle_client, &ctx[c]);
@@ -356,6 +353,21 @@ int SRLockServer::start_server () {
 	for (int i = 0; i < CLIENTS_CNT; i++) {
 		pthread_join(master_threads[i], NULL);
 	}
+	
+	getrusage(RUSAGE_SELF, &usage);
+	clock_gettime(CLOCK_REALTIME, &lastRequestTime);	// Fire the  timer
+	
+	end_user_usage = usage.ru_utime;
+	end_kernel_usage = usage.ru_stime;
+	
+	double user_cpu_microtime = ( end_user_usage.tv_sec - start_user_usage.tv_sec ) * 1E6 + ( end_user_usage.tv_usec - start_user_usage.tv_usec );
+	double kernel_cpu_microtime = ( end_kernel_usage.tv_sec - start_kernel_usage.tv_sec ) * 1E6 + ( end_kernel_usage.tv_usec - start_kernel_usage.tv_usec );
+	
+	double micro_elapsed_time = ( ( lastRequestTime.tv_sec - firstRequestTime.tv_sec ) * 1E6 + ( lastRequestTime.tv_nsec - firstRequestTime.tv_nsec )/ 1E3 );
+	std::cout << std::endl << "[Stat] Avg Elapsed time per operation (u sec): " << micro_elapsed_time / OPERATIONS_CNT / CLIENTS_CNT << std::endl;
+	std::cout << "[Stat] Avg kernel time per operation (u sec): " << kernel_cpu_microtime / OPERATIONS_CNT / CLIENTS_CNT << std::endl;
+	std::cout << "[Stat] Avg user time per operation (u sec): " << user_cpu_microtime / OPERATIONS_CNT / CLIENTS_CNT << std::endl;
+	std::cout << "[Stat] CPU utilization: " << (user_cpu_microtime + kernel_cpu_microtime) / micro_elapsed_time << std::endl;
     
 	// close server socket
 	TEST_NZ (destroy_resources());

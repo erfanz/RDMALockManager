@@ -82,11 +82,13 @@ int SRLockClient::start_operation (SRClientContext &ctx) {
 	double micro_elapsed_time = ( lastRequestTime.tv_sec - firstRequestTime.tv_sec ) * 1E6 + ( lastRequestTime.tv_nsec - firstRequestTime.tv_nsec )/1E3;
 	double lock_per_sec = (double)(OPERATIONS_CNT / (double)(micro_elapsed_time / 1000000));
 	
-	std::cout << std::endl << "[Stat] Locks (acquire & release) per sec: 	" <<  lock_per_sec << std::endl;
-	std::cout << "[STAT] Avg time per Exclusive acquisition (us)	" << sumExclusiveAcqTime / exclusiveCount << std::endl;
-	std::cout << "[STAT] Avg time per Exclusive release (us)		" << sumExclusiveRelTime / exclusiveCount << std::endl;
-	std::cout << "[STAT] Avg time per Shared acquisition (us)		" << sumSharedAcqTime / sharedCount << std::endl;
-	std::cout << "[STAT] Avg time per Shared release (us)			" << sumSharedRelime / sharedCount << std::endl;
+	// std::cout << std::endl << "[Stat] Locks (acquire & release) per sec: 	" <<  lock_per_sec << std::endl;
+	// std::cout << "[STAT] Avg time per Exclusive acquisition (us)	" << sumExclusiveAcqTime / exclusiveCount << std::endl;
+	// std::cout << "[STAT] Avg time per Exclusive release (us)		" << sumExclusiveRelTime / exclusiveCount << std::endl;
+	// std::cout << "[STAT] Avg time per Shared acquisition (us)		" << sumSharedAcqTime / sharedCount << std::endl;
+	// std::cout << "[STAT] Avg time per Shared release (us)			" << sumSharedRelime / sharedCount << std::endl;
+	std::cout << "[Summary] " << lock_per_sec << ", " << sumExclusiveAcqTime / exclusiveCount << ", " << sumExclusiveRelTime / exclusiveCount << ", " << sumSharedAcqTime / sharedCount << ", " << sumSharedRelime / sharedCount << std::endl;
+	
 
 	return 0;
 }
