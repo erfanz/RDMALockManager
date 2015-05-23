@@ -1,14 +1,14 @@
 /*
- *	ClientCentricServer.hpp
+ *	CombinedServer.hpp
  *
  *	Created on: 25.Jan.2015
  *	Author: erfanz
  */
 
-#ifndef CLIENT_CENTRIC_SERVER_H_
-#define CLIENT_CENTRIC_SERVER_H_
+#ifndef COMBINED_SERVER_H_
+#define COMBINED_SERVER_H_
 
-#include "ServerContext.hpp"
+#include "CombinedServerContext.hpp"
 #include "../util/RDMACommon.hpp"
 
 #include <stdint.h>
@@ -16,20 +16,32 @@
 #include <infiniband/verbs.h>
 
 
-class ClientCentricServer{
+class CombinedServer{
 private:
 	int	server_sockfd;		// Server's socket file descriptor
 	int	tcp_port;
 	int	ib_port;
 	
 	// memory buffers
-	uint64_t *locks;
+	//std::atomic<uint64_t> *item_lock_array;
+	std::atomic<uint64_t> item_lock_array[ITEM_CNT];
+	
+	LockRequest *outstanding_array;
+	
+	
+	void convert(uint64_t x);
+	
+	
+	int start_operations(CombinedServerContext *ctx);
 	
 	int initialize_data_structures();
-	int initialize_context(ServerContext &ctx);
+	int initialize_context(CombinedServerContext &ctx);
 	
-	static void* handle_client(void *param);
-	
+	int handle_shared_lock(CombinedServerContext &ctx);
+
+	int handle_exclusive_lock(CombinedServerContext &ctx);
+
+	int handle_release_lock(CombinedServerContext &ctx);
 public:
 	
 	
@@ -66,7 +78,7 @@ public:
 	******************************************************************************/
 	static void usage (const char *argv0);
 	
-	~ClientCentricServer ();
+	~CombinedServer ();
 	
 };
-#endif /* CLIENT_CENTRIC_SERVER_H_ */
+#endif /* COMBINED_SERVER_H_ */

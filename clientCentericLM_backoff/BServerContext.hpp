@@ -9,7 +9,7 @@
 #define B_SERVER_CONTEXT_H_
 
 #include "../util/BaseContext.hpp"
-#include "MemoryKeys.hpp"
+#include "BMemoryKeys.hpp"
 #include "../util/RDMACommon.hpp"
 #include <iostream>
 
@@ -26,7 +26,7 @@ public:
 	
 
 	// memory buffers
-	struct MemoryKeys send_message_msg;
+	struct BMemoryKeys send_message_msg;
 	
 	uint64_t* locks;
 	

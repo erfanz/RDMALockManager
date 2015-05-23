@@ -336,7 +336,6 @@ struct ibv_port_attr* port_attr, struct ibv_pd **pd, struct ibv_cq **cq, struct	
 	dev_list = NULL;
 	ib_dev = NULL;
 
-	DEBUG_COUT("port: " << ib_port);
 	TEST_NZ (ibv_query_port (*ib_ctx, ib_port, port_attr));
 
 	TEST_Z(*pd = ibv_alloc_pd (*ib_ctx));		// allocate Protection Domain

@@ -1,9 +1,9 @@
 /*
- *	BClientCentricServer.cpp
- *
- *	Created on: 25.Jan.2015
- *	Author: erfanz
- */
+*	BClientCentricServer.cpp
+*
+*	Created on: 25.Jan.2015
+*	Author: erfanz
+*/
 
 #include "BClientCentricServer.hpp"
 #include "../config.hpp"
@@ -19,7 +19,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <iostream>
-
+#include <sys/resource.h>	// getrusage()
 
 
 BClientCentricServer::~BClientCentricServer () {
@@ -60,25 +60,25 @@ void* BClientCentricServer::handle_client(void *param) {
 	/*
 	int iteration = 0;
 	while (iteration < OPERATIONS_CNT) {
-		TEST_NZ (RDMACommon::poll_completion(ctx->cq));
-		DEBUG_COUT("[Recv] request from client");
+	TEST_NZ (RDMACommon::poll_completion(ctx->cq));
+	DEBUG_COUT("[Recv] request from client");
 		
-		TEST_NZ (RDMACommon::post_RECEIVE(ctx->qp, ctx->recv_data_mr, (uintptr_t)&ctx->recv_data_msg, sizeof(int)));	// for 
-		DEBUG_COUT("[Info] receive posted to the queue");
+	TEST_NZ (RDMACommon::post_RECEIVE(ctx->qp, ctx->recv_data_mr, (uintptr_t)&ctx->recv_data_msg, sizeof(int)));	// for 
+	DEBUG_COUT("[Info] receive posted to the queue");
 		
-		if (iteration % 1000 == 0) {
-			TEST_NZ (RDMACommon::post_SEND(ctx->qp, ctx->send_data_mr, (uintptr_t)ctx->send_data_msg, 10 * sizeof(char), true));
-			DEBUG_COUT("[Sent] response to client");
+	if (iteration % 1000 == 0) {
+	TEST_NZ (RDMACommon::post_SEND(ctx->qp, ctx->send_data_mr, (uintptr_t)ctx->send_data_msg, 10 * sizeof(char), true));
+	DEBUG_COUT("[Sent] response to client");
 		
-			TEST_NZ (RDMACommon::poll_completion(ctx->cq));	// for SEND
-			DEBUG_COUT("[Info] completion received");
+	TEST_NZ (RDMACommon::poll_completion(ctx->cq));	// for SEND
+	DEBUG_COUT("[Info] completion received");
 		
-		}
-		else {
-			TEST_NZ (RDMACommon::post_SEND(ctx->qp, ctx->send_data_mr, (uintptr_t)ctx->send_data_msg, 10 * sizeof(char), false));
-			DEBUG_COUT("[Sent] response to client (without completion)");
-		}		
-		iteration++;
+	}
+	else {
+	TEST_NZ (RDMACommon::post_SEND(ctx->qp, ctx->send_data_mr, (uintptr_t)ctx->send_data_msg, 10 * sizeof(char), false));
+	DEBUG_COUT("[Sent] response to client (without completion)");
+	}		
+	iteration++;
 	}
 	*/
 	DEBUG_COUT("[Sent] buffer info to client");
@@ -144,50 +144,47 @@ int BClientCentricServer::start_server () {
 	
 	for (int i = 0; i < CLIENTS_CNT; i++){
 		// send memory locations using SEND 
-		TEST_NZ (RDMACommon::post_SEND (ctx[i].qp, ctx[i].send_message_mr, (uintptr_t)&ctx[i].send_message_msg, sizeof(struct MemoryKeys), true));
+		TEST_NZ (RDMACommon::post_SEND (ctx[i].qp, ctx[i].send_message_mr, (uintptr_t)&ctx[i].send_message_msg, sizeof(struct BMemoryKeys), true));
 		TEST_NZ (RDMACommon::poll_completion(ctx[i].cq));
 		DEBUG_COUT("[Sent] buffer info to client " << i);
 	}
 	
-	
-	
 	// Server waits for the client to muck with its memory
 	
+	struct timespec firstRequestTime, lastRequestTime;	// for calculating LPMS
+    
+	struct rusage usage;
+	struct timeval start_user_usage, start_kernel_usage, end_user_usage, end_kernel_usage;
+	clock_gettime(CLOCK_REALTIME, &firstRequestTime);	// Fire the  timer
+	getrusage(RUSAGE_SELF, &usage);
+	start_kernel_usage = usage.ru_stime;
+	start_user_usage = usage.ru_utime;
 	
-	/*************** THIS IS FOR SEND
-	// accept connections
-	for (int i = 0; i < CLIENTS_CNT; i++){
-		initialize_context(ctx[i]);
-		ctx[i].sockfd  = accept (server_sockfd, (struct sockaddr *) &cli_addr, &clilen);
-		if (ctx[i].sockfd < 0){
-			std::cerr << "ERROR on accept" << std::endl;
-			return -1;
-		}
-		std::cout << "[Conn] Received client #" << i << " on socket " << ctx[i].sockfd << std::endl;
-	
-		// create all resources
-		TEST_NZ (ctx[i].create_context());
-		DEBUG_COUT("[Info] Context for client " << i << " created");
-		
-		// connect the QPs
-		TEST_NZ (RDMACommon::connect_qp (&(ctx[i].qp), ctx[i].ib_port, ctx[i].port_attr.lid, ctx[i].sockfd));
-		DEBUG_COUT("[Conn] QPed to client " << i);
-	
-		pthread_create(&master_threads[i], NULL, BenchmarkServer::handle_client, &ctx[i]);
-	}
-	std::cout << "[Info] Established connection to all " << CLIENTS_CNT << " client(s)." << std::endl; 
-	
-	//wait for handlers to finish
-	for (int i = 0; i < CLIENTS_CNT; i++) {
-		pthread_join(master_threads[i], NULL);
-	}
-	*/
 	for (int i = 0; i < CLIENTS_CNT; i++) {
 		TEST_NZ (sock_sync_data (ctx[i].sockfd, 1, "W", &temp_char));	// just send a dummy char back and forth
 		DEBUG_COUT("[Conn] Client " << i << " notified it's finished");
 		TEST_NZ (ctx[i].destroy_context());
 		std::cout << "[Info] Destroying client " << i << " resources" << std::endl;
-	}	
+	}
+	
+	getrusage(RUSAGE_SELF, &usage);
+	clock_gettime(CLOCK_REALTIME, &lastRequestTime);	// Fire the  timer
+	
+	end_user_usage = usage.ru_utime;
+	end_kernel_usage = usage.ru_stime;
+	
+	
+	double user_cpu_microtime = ( end_user_usage.tv_sec - start_user_usage.tv_sec ) * 1E6 + ( end_user_usage.tv_usec - start_user_usage.tv_usec );
+	double kernel_cpu_microtime = ( end_kernel_usage.tv_sec - start_kernel_usage.tv_sec ) * 1E6 + ( end_kernel_usage.tv_usec - start_kernel_usage.tv_usec );
+	
+	double micro_elapsed_time = ( ( lastRequestTime.tv_sec - firstRequestTime.tv_sec ) * 1E6 + ( lastRequestTime.tv_nsec - firstRequestTime.tv_nsec )/ 1E3 );
+	std::cout << std::endl << "[Stat] Avg Elapsed time per operation (u sec): " << micro_elapsed_time / OPERATIONS_CNT / CLIENTS_CNT << std::endl;
+	std::cout << "[Stat] Avg kernel time per operation (u sec): " << kernel_cpu_microtime / OPERATIONS_CNT / CLIENTS_CNT << std::endl;
+	std::cout << "[Stat] Avg user time per operation (u sec): " << user_cpu_microtime / OPERATIONS_CNT / CLIENTS_CNT << std::endl;
+	std::cout << "[Stat] CPU utilization: " << (user_cpu_microtime + kernel_cpu_microtime) / micro_elapsed_time << std::endl;
+
+	
+	
 	std::cout << "[Info] Server's ready to gracefully get destroyed" << std::endl;	
 }
 

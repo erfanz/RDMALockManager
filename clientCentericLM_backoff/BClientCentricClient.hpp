@@ -18,6 +18,7 @@
 
 class BClientCentricClient{
 private:
+	static bool select_item ();
 	static int start_benchmark(BClientContext &ctx);
 	static bool request_shared_lock(BClientContext &ctx, int lock_id);
 	static bool request_exclusive_lock(BClientContext &ctx, int lock_id);

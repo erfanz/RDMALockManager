@@ -10,7 +10,7 @@
 
 #include "../util/BaseContext.hpp"
 #include "../util/RDMACommon.hpp"
-#include "MemoryKeys.hpp"
+#include "BMemoryKeys.hpp"
 #include <iostream>
 
 class BClientContext : public BaseContext{
@@ -24,7 +24,7 @@ public:
 	struct ibv_mr *lock_result_mr;	
 	
 	// memory bufferes
-	struct MemoryKeys	recv_memory_msg;
+	struct BMemoryKeys	recv_memory_msg;
 	uint64_t lock_result;
 	
 	// remote memory handlers

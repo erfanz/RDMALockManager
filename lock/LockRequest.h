@@ -14,7 +14,10 @@ struct LockRequest {
 	enum RequestType {
 		SHARED,
 		EXCLUSIVE,
-		RELEASE
+		RELEASE,
+		RELEASE_SHARED,
+		RELEASE_EXCLUSIVE,		
+		EMPTY
 	} request_type;
 };
 

@@ -1,12 +1,12 @@
 /*
- *	ClientCentricClient.hpp
+ *	CombiendClient.hpp
  *
  *	Created on: 1.May.2015
  *	Author: erfanz
  */
 
-#ifndef CLIENT_CENTRIC_CLIENT_H_
-#define CLIENT_CENTRIC_CLIENT_H_
+#ifndef COMBINED_CLIENT_H_
+#define COMBINED_CLIENT_H_
 
 #include <byteswap.h>
 #include <stdint.h>
@@ -14,16 +14,22 @@
 #include <infiniband/verbs.h>
 
 #include "../util/RDMACommon.hpp"
-#include "ClientContext.hpp"
+#include "CombinedClientContext.hpp"
 
-class ClientCentricClient{
+
+
+class CombinedClient{
 private:
-	static int start_benchmark(ClientContext &ctx);
-	static bool request_shared_lock(ClientContext &ctx, int lock_id);
-	static bool request_exclusive_lock(ClientContext &ctx, int lock_id);
-	static int release_shared_lock(ClientContext &ctx, int lock_id);
-	static int release_exclusive_lock(ClientContext &ctx, int lock_id);
-	static bool re_inquire_shared_lock(ClientContext &ctx, int lock_id);
+	static int select_item (struct LockRequest &req);
+	static int hold_lock ();
+	static int start_benchmark(CombinedClientContext &ctx);
+	static int acquire_shared_lock(CombinedClientContext &ctx);
+	static int acquire_exclusive_lock(CombinedClientContext &ctx);
+	static bool try_acquire_shared_lock(CombinedClientContext &ctx);
+	static bool try_acquire_exclusive_lock(CombinedClientContext &ctx);
+	static int register_request_as_outstanding(CombinedClientContext &ctx);	
+	static int release_lock (CombinedClientContext &ctx);
+	
 	
 
 public:
@@ -60,4 +66,4 @@ public:
 	static void usage (const char *argv0);
 };
 
-#endif /* CLIENT_CENTRIC_CLIENT_H_ */
+#endif /* COMBINED_CLIENT_H_ */

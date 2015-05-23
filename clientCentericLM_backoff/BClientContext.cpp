@@ -17,7 +17,7 @@ int BClientContext::register_memory() {
 			| IBV_ACCESS_REMOTE_READ
 				| IBV_ACCESS_REMOTE_WRITE;
 	
-	TEST_Z(recv_memory_mr		= ibv_reg_mr(pd, &recv_memory_msg, sizeof(struct MemoryKeys), mr_flags));
+	TEST_Z(recv_memory_mr		= ibv_reg_mr(pd, &recv_memory_msg, sizeof(struct BMemoryKeys), mr_flags));
 	TEST_Z(lock_result_mr			= ibv_reg_mr(pd, &lock_result, sizeof(uint64_t), mr_flags));
 	
 	return 0;

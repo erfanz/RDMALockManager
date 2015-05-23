@@ -21,7 +21,7 @@ int BServerContext::register_memory() {
 					| IBV_ACCESS_REMOTE_ATOMIC;
 			
 
-	TEST_Z(send_message_mr	= ibv_reg_mr(pd, &send_message_msg, sizeof(struct MemoryKeys), mr_flags));
+	TEST_Z(send_message_mr	= ibv_reg_mr(pd, &send_message_msg, sizeof(struct BMemoryKeys), mr_flags));
 	TEST_Z(locks_mr			= ibv_reg_mr(pd, locks, ITEM_CNT * sizeof(uint64_t), mr_flags));
 	
 	return 0;

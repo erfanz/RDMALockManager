@@ -30,106 +30,26 @@ void BClientCentricClient::usage (const char *argv0) {
 	std::cout << argv0 << " connects to server(s) specified in the config file" << std::endl;
 }
 
-/******************** For Read
-int BenchmarkClient::start_benchmark(ClientContext *ctx) {
-	int		server_num;
-	int		abort_cnt = 0;
-	bool	abort_flag;
-	double cumulative_latency = 0;
-	int signaledPosts = 0;
-	struct timespec firstRequestTime, lastRequestTime;				// for calculating TPMS
-	struct timespec beforeSending, afterSending;				// for calculating TPMS
-	
-	struct timespec before_read_ts, after_read_ts, after_fetch_info, after_commit_ts, after_lock, after_decrement, after_unlock;
-    
-	struct rusage usage;
-    struct timeval start_user_usage, start_kernel_usage, end_user_usage, end_kernel_usage;
-	char temp_char;
-	
-	
-	TEST_NZ (sock_sync_data (ctx->sockfd, 1, "W", &temp_char));	// just send a dummy char back and forth
-	
-	
-	DEBUG_COUT ("[Info] Benchmark now gets started");
-	
-	clock_gettime(CLOCK_REALTIME, &firstRequestTime);	// Fire the  timer
-    getrusage(RUSAGE_SELF, &usage);
-    start_kernel_usage = usage.ru_stime;
-    start_user_usage = usage.ru_utime;
-	
-	int offset;
-	uint64_t *remote_address;
-	
-	int iteration = 0;
-	while (iteration < OPERATIONS_CNT) {
-		offset = rand() % (SERVER_REGION_SIZE - BUFFER_SIZE);
-		remote_address = (uint64_t *)(offset + ((uint64_t)ctx->peer_data_mr.addr));
-		
-		if (iteration % 1000 == 0) {
-			//clock_gettime(CLOCK_REALTIME, &beforeSending);	// Fire the  timer
-			
-			TEST_NZ (RDMACommon::post_RDMA_READ_WRT(IBV_WR_RDMA_READ,
-			ctx->qp,
-			ctx->recv_data_mr,
-			(uint64_t)ctx->recv_data_msg,
-			&(ctx->peer_data_mr),
-			(uint64_t)remote_address,
-			(uint32_t)BUFFER_SIZE,
-			true));
-			
-			TEST_NZ (RDMACommon::poll_completion(ctx->cq));
-			//TEST_NZ (RDMACommon::event_based_poll_completion(ctx->comp_channel, ctx->cq));
-			
-			//clock_gettime(CLOCK_REALTIME, &afterSending);	// Fire the  timer
-			
-			//cumulative_latency =+ ( ( afterSending.tv_sec - beforeSending.tv_sec ) * 1E9 + ( afterSending.tv_nsec - beforeSending.tv_nsec ) );
-			//signaledPosts++;
-		}
-		else {
-			TEST_NZ (RDMACommon::post_RDMA_READ_WRT(IBV_WR_RDMA_READ,
-			ctx->qp,
-			ctx->recv_data_mr,
-			(uint64_t)ctx->recv_data_msg,
-			&(ctx->peer_data_mr),
-			(uint64_t)remote_address,
-			(uint32_t)BUFFER_SIZE,
-			false));
-		}
-	
-		//DEBUG_COUT("[RDMA] Response sent");
-		//DEBUG_COUT("[Info] Buffer value: " << ctx->local_buffer);
-		iteration++;
-	}
 
-    getrusage(RUSAGE_SELF, &usage);
-    end_user_usage = usage.ru_utime;
-    end_kernel_usage = usage.ru_stime;
+bool BClientCentricClient::select_item () {
+	int target_idx = 0;
+	if (ITEM_CNT <= RAND_MAX){
+		target_idx = rand() % ITEM_CNT; // 0 to ITEM_CNT-1
+	}
+	else {
+		int num_fragment = (int) ITEM_CNT / RAND_MAX + 1;
+		int target_idx = ((rand() % num_fragment)*RAND_MAX - 1) + (rand() % ITEM_CNT);
+	}
 	
-	clock_gettime(CLOCK_REALTIME, &lastRequestTime);	// Fire the  timer
-	double user_cpu_microtime = ( end_user_usage.tv_sec - start_user_usage.tv_sec ) * 1E6 + ( end_user_usage.tv_usec - start_user_usage.tv_usec );
-	double kernel_cpu_microtime = ( end_kernel_usage.tv_sec - start_kernel_usage.tv_sec ) * 1E6 + ( end_kernel_usage.tv_usec - start_kernel_usage.tv_usec );
 	
-	double micro_elapsed_time = ( ( lastRequestTime.tv_sec - firstRequestTime.tv_sec ) * 1E9 + ( lastRequestTime.tv_nsec - firstRequestTime.tv_nsec ) ) / 1000;
-	
-	//double latency_in_micro = (double)(micro_elapsed_time / OPERATIONS_CNT);
-	double latency_in_micro = (double)(cumulative_latency / signaledPosts) / 1000;
-	
-	double mega_byte_per_sec = ((BUFFER_SIZE * OPERATIONS_CNT / 1E6 ) / (micro_elapsed_time / 1E6) );
-	double operations_per_sec = OPERATIONS_CNT / (micro_elapsed_time / 1E6);
-	double cpu_utilization = (user_cpu_microtime + kernel_cpu_microtime) / micro_elapsed_time;
-	
-	std::cout << "[Stat] Avg latency(u sec):   	" << latency_in_micro << std::endl; 
-	std::cout << "[Stat] MegaByte per Sec:   	" << mega_byte_per_sec <<  std::endl;
-	std::cout << "[Stat] Operations per Sec:   	" << operations_per_sec <<  std::endl;
-	std::cout << "[Stat] CPU utilization:    	" << cpu_utilization << std::endl;
-	std::cout << "[Stat] USER CPU utilization:    	" << user_cpu_microtime / micro_elapsed_time << std::endl;
-	std::cout << "[Stat] KERNEL CPU utilization:    	" << kernel_cpu_microtime / micro_elapsed_time << std::endl;
-	
-	std::cout  << latency_in_micro << '\t' << mega_byte_per_sec << '\t' << operations_per_sec << '\t' << cpu_utilization << std::endl;
-	
-	return 0;
+	double pdf = (double) rand()/RAND_MAX; // 50-50 exclusive and shared locks
+	if (pdf >= SHARED_TO_MIX_RATIO)
+		// exclusive
+		return true;
+	else 
+		// shared
+		return false;
 }
-*/
 
 
 bool BClientCentricClient::re_inquire_shared_lock(BClientContext &ctx, int lock_id) {
@@ -298,15 +218,19 @@ int BClientCentricClient::start_benchmark(BClientContext &ctx) {
 	
 
 	DEBUG_COUT ("[Info] Benchmark now gets started");
-
+	
+	
+	clock_gettime(CLOCK_REALTIME, &firstRequestTime);	// Fire the  timer
+	
 	while (iteration < OPERATIONS_CNT) {
-		lock_id = rand() % (ITEM_CNT);
+		lock_id = rand() % ITEM_CNT;
 		
 		abort_flag = false;
 		attemp_cnt = 1;
 		
-		if (rand() % 2 == 0){
-			clock_gettime(CLOCK_REALTIME, &firstRequestTime);	// Fire the  timer
+		
+		if (select_item() == false){
+			//clock_gettime(CLOCK_REALTIME, &firstRequestTime);	// Fire the  timer
 			
 			// Go for shared lock
 			total_shared_request++;
@@ -320,12 +244,13 @@ int BClientCentricClient::start_benchmark(BClientContext &ctx) {
 				attemp_cnt++;
 				while (re_inquire_shared_lock(ctx, lock_id) == false)
 				{
-					if (attemp_cnt >= MAXIMUM_ATTEMPTS) {
-						DEBUG_COUT("[Info] Client gives up at requesting for lock " << lock_id);
-						abort_flag = true;
-						aborted_shared++;
-						break;
-					}
+					// if (attemp_cnt >= MAXIMUM_ATTEMPTS) {
+					// 	DEBUG_COUT("[Info] Client gives up at requesting for lock " << lock_id);
+					// 	abort_flag = true;
+					// 	aborted_shared++;
+					// 	break;
+					// }
+					
 					// The client backs off for a pre-defined amount of time.
 					DEBUG_COUT("[Info] Client backs off for " << BACK_OFF_MICRO_SEC << " micro seconds and try again");
 					sleep_for_microsec(BACK_OFF_MICRO_SEC);
@@ -342,24 +267,24 @@ int BClientCentricClient::start_benchmark(BClientContext &ctx) {
 			// de-register from the server
 			TEST_NZ(release_shared_lock(ctx, lock_id));
 			DEBUG_COUT("");
-			clock_gettime(CLOCK_REALTIME, &lastRequestTime);	// Fire the  timer
-			elapsed_shared_time += ( ( lastRequestTime.tv_sec - firstRequestTime.tv_sec ) * 1E9 + ( lastRequestTime.tv_nsec - firstRequestTime.tv_nsec ) ) / 1000;
+			//clock_gettime(CLOCK_REALTIME, &lastRequestTime);	// Fire the  timer
+			//elapsed_shared_time += ( ( lastRequestTime.tv_sec - firstRequestTime.tv_sec ) * 1E9 + ( lastRequestTime.tv_nsec - firstRequestTime.tv_nsec ) ) / 1000;
 				
 		}
 		else {
 			// Go for exclusive lock 
-			clock_gettime(CLOCK_REALTIME, &firstRequestTime);	// Fire the  timer
+			//clock_gettime(CLOCK_REALTIME, &firstRequestTime);	// Fire the  timer
 			
 			total_exclusive_request++;
 			
 			while (request_exclusive_lock(ctx, lock_id) == false)
 			{
-				if (attemp_cnt >= MAXIMUM_ATTEMPTS) {
-					DEBUG_COUT("[Info] Client gives up at requesting for lock " << lock_id);
-					abort_flag = true;
-					aborted_exclusive++;
-					break;
-				}
+				// if (attemp_cnt >= MAXIMUM_ATTEMPTS) {
+				// 	DEBUG_COUT("[Info] Client gives up at requesting for lock " << lock_id);
+				// 	abort_flag = true;
+				// 	aborted_exclusive++;
+				// 	break;
+				// }
 				// The client backs off for a pre-defined amount of time.
 				DEBUG_COUT("[Info] Client backs off for " << BACK_OFF_MICRO_SEC << " micro seconds and try again");
 				sleep_for_microsec(BACK_OFF_MICRO_SEC);
@@ -375,19 +300,25 @@ int BClientCentricClient::start_benchmark(BClientContext &ctx) {
 				release_exclusive_lock(ctx, lock_id);
 			}
 			DEBUG_COUT("");
-			clock_gettime(CLOCK_REALTIME, &lastRequestTime);	// Fire the  timer
-			
-			elapsed_exclusive_time += ( ( lastRequestTime.tv_sec - firstRequestTime.tv_sec ) * 1E9 + ( lastRequestTime.tv_nsec - firstRequestTime.tv_nsec ) ) / 1000;
+			//clock_gettime(CLOCK_REALTIME, &lastRequestTime);	// Fire the  timer
+			//elapsed_exclusive_time += ( ( lastRequestTime.tv_sec - firstRequestTime.tv_sec ) * 1E9 + ( lastRequestTime.tv_nsec - firstRequestTime.tv_nsec ) ) / 1000;
 		}
 		iteration++;
 	}
 	
+	clock_gettime(CLOCK_REALTIME, &lastRequestTime);	// Fire the  timer
+	std::cout << "total shared cnt " << total_shared_request << std::endl;
+	std::cout << "total exclusive cnt " << total_exclusive_request << std::endl;
+	
+	double micro_elapsed_time = ( ( lastRequestTime.tv_sec - firstRequestTime.tv_sec ) * 1E6 + ( lastRequestTime.tv_nsec - firstRequestTime.tv_nsec )/ 1E3 );
+	double lock_per_sec = (double)(OPERATIONS_CNT / (double)(micro_elapsed_time / 1000000));
+	std::cout << "[STAT] Avg Lock per second	" << lock_per_sec << std::endl;
+	//std::cout << "[STAT] Avg time per Exclusive op (us)	" << (double)elapsed_exclusive_time / total_exclusive_request << std::endl;
+	//std::cout << "[STAT] Avg time per Shared    op (us)	" << (double)elapsed_shared_time / total_shared_request << std::endl;
 	std::cout << "[STAT] Avg request per Exclusive op	" << (double)total_exclusive_attemps / total_exclusive_request << std::endl;
 	std::cout << "[STAT] Avg request per Shared    op	" << (double)total_shared_attemps / total_shared_request << std::endl;
-	std::cout << "[STAT] Avg time per Exclusive op (us)	" << (double)elapsed_exclusive_time / total_exclusive_request << std::endl;
-	std::cout << "[STAT] Avg time per Shared    op (us)	" << (double)elapsed_shared_time / total_shared_request << std::endl;
-	std::cout << "[STAT] Abort rate for Exclusive op	" << (double)aborted_exclusive / total_exclusive_request << std::endl;
-	std::cout << "[STAT] Abort rate for Shared    op	" << (double)aborted_shared / total_shared_request << std::endl;
+	//std::cout << "[STAT] Abort rate for Exclusive op	" << (double)aborted_exclusive / total_exclusive_request << std::endl;
+	//std::cout << "[STAT] Abort rate for Shared    op	" << (double)aborted_shared / total_shared_request << std::endl;
 		
 	/*
 
@@ -417,10 +348,7 @@ int BClientCentricClient::start_benchmark(BClientContext &ctx) {
 
 	std::cout  << latency_in_micro << '\t' << mega_byte_per_sec << '\t' << operations_per_sec << '\t' << cpu_utilization << std::endl;
 	*/
-	
 
-		
-		
 	return 0;
 }
 
@@ -440,7 +368,7 @@ int BClientCentricClient::start_client () {
 	TEST_NZ (ctx.create_context());
 	
 	// before connecting the queue pairs, we post the RECEIVE job to be ready for the server's message containing its memory locations
-	RDMACommon::post_RECEIVE(ctx.qp, ctx.recv_memory_mr, (uintptr_t)&ctx.recv_memory_msg, sizeof(struct MemoryKeys));
+	RDMACommon::post_RECEIVE(ctx.qp, ctx.recv_memory_mr, (uintptr_t)&ctx.recv_memory_msg, sizeof(struct BMemoryKeys));
 	
 	TEST_NZ (RDMACommon::connect_qp (&(ctx.qp), ctx.ib_port, ctx.port_attr.lid, ctx.sockfd));
 
