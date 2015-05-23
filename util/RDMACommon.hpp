@@ -167,6 +167,9 @@ public:
 	static int create_queuepair(struct ibv_context *context, struct ibv_pd *pd, struct ibv_cq *cq, struct ibv_qp **qp);
 	
 	
+	static int create_queuepair2(struct ibv_context *ib_ctx, struct ibv_pd *pd, struct ibv_cq *cq_send, struct ibv_cq *cq_receive, struct ibv_qp **qp);
+	
+	
 	/******************************************************************************
 	* Function: poll_completion
 	*
@@ -190,6 +193,10 @@ public:
 	
 	static int build_connection(int ib_port, struct ibv_context** ib_ctx,
 	struct ibv_port_attr* port_attr, struct ibv_pd **pd, struct ibv_cq **cq, struct ibv_comp_channel **comp_channel, int cq_size);
+	
+	static int build_connection2(int ib_port, struct ibv_context** ib_ctx,
+	struct ibv_port_attr* port_attr, struct ibv_pd **pd, struct ibv_cq **cq_send, struct ibv_cq **cq_receive, struct	ibv_comp_channel **comp_channel_send, struct	ibv_comp_channel **comp_channel_receive,  int cq_size);
+	
 	
 	
 	/******************************************************************************

@@ -82,11 +82,13 @@ int SRLockClient::start_operation (SRClientContext &ctx) {
 	double micro_elapsed_time = ( lastRequestTime.tv_sec - firstRequestTime.tv_sec ) * 1E6 + ( lastRequestTime.tv_nsec - firstRequestTime.tv_nsec )/1E3;
 	double lock_per_sec = (double)(OPERATIONS_CNT / (double)(micro_elapsed_time / 1000000));
 	
-	std::cout << std::endl << "[Stat] Locks (acquire & release) per sec: 	" <<  lock_per_sec << std::endl;
-	std::cout << "[STAT] Avg time per Exclusive acquisition (us)	" << sumExclusiveAcqTime / exclusiveCount << std::endl;
-	std::cout << "[STAT] Avg time per Exclusive release (us)		" << sumExclusiveRelTime / exclusiveCount << std::endl;
-	std::cout << "[STAT] Avg time per Shared acquisition (us)		" << sumSharedAcqTime / sharedCount << std::endl;
-	std::cout << "[STAT] Avg time per Shared release (us)			" << sumSharedRelime / sharedCount << std::endl;
+	// std::cout << std::endl << "[Stat] Locks (acquire & release) per sec: 	" <<  lock_per_sec << std::endl;
+	// std::cout << "[STAT] Avg time per Exclusive acquisition (us)	" << sumExclusiveAcqTime / exclusiveCount << std::endl;
+	// std::cout << "[STAT] Avg time per Exclusive release (us)		" << sumExclusiveRelTime / exclusiveCount << std::endl;
+	// std::cout << "[STAT] Avg time per Shared acquisition (us)		" << sumSharedAcqTime / sharedCount << std::endl;
+	// std::cout << "[STAT] Avg time per Shared release (us)			" << sumSharedRelime / sharedCount << std::endl;
+	std::cout << "[Summary] " << lock_per_sec << ", " << sumExclusiveAcqTime / exclusiveCount << ", " << sumExclusiveRelTime / exclusiveCount << ", " << sumSharedAcqTime / sharedCount << ", " << sumSharedRelime / sharedCount << std::endl;
+	
 
 	return 0;
 }
@@ -121,9 +123,9 @@ int SRLockClient::acquire_lock (SRClientContext &ctx, struct LockRequest &req, s
 		
 		// TEST_NZ (sock_write(ctx.sockfd, (char *)&req, sizeof(struct LockRequest)));
 		TEST_NZ (RDMACommon::post_SEND(ctx.qp, ctx.lock_req_mr, (uintptr_t)&req, sizeof(struct LockRequest), true));
-		TEST_NZ (RDMACommon::poll_completion(ctx.cq));	// Ack for SEND
+		TEST_NZ (RDMACommon::poll_completion(ctx.cq));	// Ack for SEND (false)
 			
-		DEBUG_COUT("[Sent] LockRequest::Request (" << req.request_type << ") to LM.");
+		DEBUG_COUT("[Sent] LockRequest::Request (" << req.request_type << ", " << req.request_item << ") to LM.");
 		
 		//TEST_NZ (sock_read(ctx.sockfd, (char *)&res, sizeof(struct LockResponse)));
 		TEST_NZ (RDMACommon::poll_completion(ctx.cq));	// Receive LockResponse
@@ -131,7 +133,7 @@ int SRLockClient::acquire_lock (SRClientContext &ctx, struct LockRequest &req, s
 		if (res.response_type == LockResponse::GRANTED)
 			DEBUG_COUT("[Recv] " << req.request_type << " LockResponse (result: granted)");
 		else {
-			DEBUG_CERR("[Error] " << req.request_type << "LockResponse (result: failed)");
+			DEBUG_COUT("[Error] " << req.request_type << " LockResponse result: " << res.response_type );
 		}
 				
 		return 0;
@@ -146,7 +148,7 @@ int SRLockClient::release_lock (SRClientContext &ctx, struct LockRequest &req, s
 		
 		//TEST_NZ (sock_write(ctx.sockfd, (char *)&req, sizeof(struct LockRequest)));
 		TEST_NZ (RDMACommon::post_SEND(ctx.qp, ctx.lock_req_mr, (uintptr_t)&req, sizeof(struct LockRequest), true));
-		TEST_NZ (RDMACommon::poll_completion(ctx.cq));	// Ack for SEND
+		TEST_NZ (RDMACommon::poll_completion(ctx.cq));	// Ack for SEND (false)
 			
 		DEBUG_COUT("[Sent] LockRequest::Request (RELEASE) to LM.");
 		
@@ -156,7 +158,7 @@ int SRLockClient::release_lock (SRClientContext &ctx, struct LockRequest &req, s
 		if (res.response_type == LockResponse::RELEASED)
 			DEBUG_COUT("[Recv] RELEASE LockResponse (result: released)");
 		else {
-			DEBUG_COUT("[Recv] RELEASE LockResponse (result: failed)");
+			DEBUG_COUT("[Error] RELEASE LockResponse result: " << res.response_type);
 		}
 		return 0;
 	}

@@ -19,6 +19,7 @@
 #include <netdb.h>
 #include <iostream>
 #include <netinet/tcp.h>	// for setsockopt
+#include <sys/resource.h>	// getrusage()
 
 std::list <QueuedRequest> LockServer::list_array[ITEM_CNT];
 std::mutex LockServer::list_mutex[ITEM_CNT];
@@ -41,11 +42,6 @@ void* LockServer::handle_client(void *param) {
 int LockServer::start_operation(ServerContext &ctx) {
 	//start operation for each client connection
 	char	temp_char;
-
-	struct timespec firstRequestTime, lastRequestTime;	// for calculating LPMS
-	//double avg_lock = 0;
-
-	clock_gettime(CLOCK_REALTIME, &firstRequestTime);	// Fire the  timer
 
 	struct LockRequest req;
 	struct LockResponse res;
@@ -80,14 +76,6 @@ int LockServer::start_operation(ServerContext &ctx) {
 		TEST_NZ (register_request(ctx,req,res));
 		
 	}
-
-	clock_gettime(CLOCK_REALTIME, &lastRequestTime);	// Fire the  timer
-	double micro_elapsed_time = ( ( lastRequestTime.tv_sec - firstRequestTime.tv_sec ) * 1E9 + ( lastRequestTime.tv_nsec - firstRequestTime.tv_nsec ) ) / 1E3;
-	//avg_lock /= 1000;
-
-	std::cout << std::endl << "Total Elapsed time (u sec): " << micro_elapsed_time << std::endl;
-
-	//std::cout << "[Stat] Avg lock (u sec):            	" << (double)avg_lock / committed_cnt << std::endl;
 
 	DEBUG_COUT (std::endl << "[Info] Successfully executed all operations of client");
 
@@ -280,7 +268,15 @@ int LockServer::start_server () {
     
 	std::cout << "[Info] Established connection to all " << CLIENTS_CNT << " client(s)." << std::endl; 
     
+	struct timespec firstRequestTime, lastRequestTime;	// for calculating LPMS
+	clock_gettime(CLOCK_REALTIME, &firstRequestTime);	// Fire the  timer
     
+	struct rusage usage;
+	struct timeval start_user_usage, start_kernel_usage, end_user_usage, end_kernel_usage;
+	getrusage(RUSAGE_SELF, &usage);
+	start_kernel_usage = usage.ru_stime;
+	start_user_usage = usage.ru_utime;
+	
 	for (int c = 0; c < CLIENTS_CNT; c++) {
 		pthread_create(&master_threads[c], NULL, LockServer::handle_client, &ctx[c]);
 	}
@@ -290,6 +286,22 @@ int LockServer::start_server () {
 		pthread_join(master_threads[i], NULL);
 	}
     
+	getrusage(RUSAGE_SELF, &usage);
+	clock_gettime(CLOCK_REALTIME, &lastRequestTime);	// Fire the  timer
+	
+	end_user_usage = usage.ru_utime;
+	end_kernel_usage = usage.ru_stime;
+	
+	double user_cpu_microtime = ( end_user_usage.tv_sec - start_user_usage.tv_sec ) * 1E6 + ( end_user_usage.tv_usec - start_user_usage.tv_usec );
+	double kernel_cpu_microtime = ( end_kernel_usage.tv_sec - start_kernel_usage.tv_sec ) * 1E6 + ( end_kernel_usage.tv_usec - start_kernel_usage.tv_usec );
+	std::cout << end_kernel_usage.tv_sec << " " << firstRequestTime.tv_sec << " " << lastRequestTime.tv_nsec << " " << firstRequestTime.tv_nsec << std::endl;
+	
+	double micro_elapsed_time = ( ( lastRequestTime.tv_sec - firstRequestTime.tv_sec ) * 1E6 + ( lastRequestTime.tv_nsec - firstRequestTime.tv_nsec )/ 1E3 );
+	std::cout << std::endl << "[Stat] Avg Elapsed time per operation (u sec): " << micro_elapsed_time / OPERATIONS_CNT / CLIENTS_CNT << std::endl;
+	std::cout << "[Stat] Avg kernel time per operation (u sec): " << kernel_cpu_microtime / OPERATIONS_CNT / CLIENTS_CNT << std::endl;
+	std::cout << "[Stat] Avg user time per operation (u sec): " << user_cpu_microtime / OPERATIONS_CNT / CLIENTS_CNT << std::endl;
+	std::cout << "[Stat] CPU utilization: " << (user_cpu_microtime + kernel_cpu_microtime) / micro_elapsed_time << std::endl;
+	
 	// close server socket
 	TEST_NZ (destroy_resources());
 	std::cout << "[Info] Server is done and destroyed its resources!" << std::endl;
@@ -310,6 +322,9 @@ int main (int argc, char *argv[]) {
         LockServer::usage(argv[0]);
         return 1;
     }
+	
+	pin_to_CPU (0);
+	
     LockServer server;
     server.start_server();
     return 0;
